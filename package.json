@@ -5,9 +5,9 @@
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
-    "node-start": "ts-node-esm",
+    "node-start": "node --import ./ts-node.register.mjs",
     "node-build": "tsc",
-    "test": "npm run build"
+    "test": "npm run node-build -- --noEmit"
   },
   "repository": {
     "type": "git",
