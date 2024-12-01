@@ -2,9 +2,10 @@
   "name": "advent-of-code-2024",
   "version": "0.1.0",
   "description": "Solutions for Advent of Code 2024 in TypeScript",
+  "type": "module",
   "main": "dist/index.js",
   "scripts": {
-    "node-start": "ts-node",
+    "node-start": "ts-node-esm",
     "node-build": "tsc",
     "test": "npm run build"
   },

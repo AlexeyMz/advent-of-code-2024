@@ -9,7 +9,7 @@
             "request": "launch",
             "name": "Launch Current File",
             "runtimeExecutable": "node",
-            "runtimeArgs": ["--nolazy", "-r", "ts-node/register/transpile-only"],
+            "runtimeArgs": ["--import", "./ts-node.register.mjs"],
             "program": "${file}",
             "cwd": "${workspaceRoot}",
             "internalConsoleOptions": "openOnSessionStart",
