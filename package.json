@@ -1,0 +1,26 @@
+{
+  "name": "advent-of-code-2024",
+  "version": "0.1.0",
+  "description": "Solutions for Advent of Code 2024 in TypeScript",
+  "main": "dist/index.js",
+  "scripts": {
+    "node-start": "ts-node",
+    "node-build": "tsc",
+    "test": "npm run build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AlexeyMz/advent-of-code-2024.git"
+  },
+  "keywords": [
+    "advent-of-code",
+    "2024"
+  ],
+  "author": "AlexeyMz",
+  "license": "GPL-3.0",
+  "devDependencies": {
+    "@types/node": "^22.10.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.2"
+  }
+}
