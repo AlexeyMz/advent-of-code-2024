@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 
 import { getDataPath } from './core/project.mjs';
 
-export async function solvePuzzle02Basic() {
+export async function solvePuzzleBasic() {
   const content = await readFile(getDataPath('input/puzzle02.txt'), {encoding: 'utf8'});
   const reports = parseReports(content);
 
@@ -16,7 +16,7 @@ export async function solvePuzzle02Basic() {
   console.log(`Puzzle 02 (basic): ${safeCount}`);
 }
 
-export async function solvePuzzle02Advanced() {
+export async function solvePuzzleAdvanced() {
   const content = await readFile(getDataPath('input/puzzle02.txt'), {encoding: 'utf8'});
   const reports = parseReports(content);
 
@@ -80,6 +80,6 @@ function rangeNext(index: number, skipAt: number | undefined): number {
 }
 
 (async function main() {
-  await solvePuzzle02Basic();
-  await solvePuzzle02Advanced();
+  await solvePuzzleBasic();
+  await solvePuzzleAdvanced();
 })();

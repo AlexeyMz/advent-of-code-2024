@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 
 import { getDataPath } from './core/project.mjs';
 
-export async function solvePuzzle01Basic() {
+export async function solvePuzzleBasic() {
   const content = await readFile(getDataPath('input/puzzle01.txt'), {encoding: 'utf8'});
   const [leftList, rightList] = parseLists(content);
 
@@ -17,7 +17,7 @@ export async function solvePuzzle01Basic() {
   console.log(`Puzzle 01 (basic): ${totalDifference}`);
 }
 
-export async function solvePuzzle01Advanced() {
+export async function solvePuzzleAdvanced() {
   const content = await readFile(getDataPath('input/puzzle01.txt'), {encoding: 'utf8'});
   const [leftList, rightList] = parseLists(content);
 
@@ -55,6 +55,6 @@ function parseLists(content: string): readonly[number[], number[]] {
 }
 
 (async function main() {
-  await solvePuzzle01Basic();
-  await solvePuzzle01Advanced();
+  await solvePuzzleBasic();
+  await solvePuzzleAdvanced();
 })();
