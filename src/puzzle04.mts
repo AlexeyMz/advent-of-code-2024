@@ -98,6 +98,6 @@ function matchWord(lines: string[], word: string, position: Vector, direction: V
 }
 
 (async function main() {
-  // await solvePuzzleBasic();
+  await solvePuzzleBasic();
   await solvePuzzleAdvanced();
 })();
