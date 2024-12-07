@@ -10,6 +10,9 @@
             "name": "Launch Current File",
             "runtimeExecutable": "node",
             "runtimeArgs": ["--import", "./ts-node.register.mjs"],
+            "env": {
+                "TS_NODE_PROJECT": "./tsconfig.node.json"
+            },
             "program": "${file}",
             "cwd": "${workspaceRoot}",
             "internalConsoleOptions": "openOnSessionStart",
