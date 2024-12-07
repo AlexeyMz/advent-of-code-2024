@@ -7,7 +7,7 @@ export async function solvePuzzleBasic() {
   const [dependencies, updates] = parseGraph(content);
 
   await writeFile(
-    getDataPath('output/puzzle06_graph.ttl'),
+    getDataPath('output/puzzle05_graph.ttl'),
     generateTurtle(dependencies, updates),
     {encoding: 'utf8'}
   );
