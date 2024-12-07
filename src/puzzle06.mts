@@ -40,27 +40,6 @@ export async function solvePuzzleAdvanced() {
   let visited = grid.clone();
   let rays = Grid.empty(grid.rows, grid.columns);
 
-  const fillBackwardRay = (from: Vector, forward: Direction) => {
-    let at = from;
-    while (true) {
-      const next = moveInDirection(at, forward);
-      if (grid.tryGetChar(next[0], next[1], '#') === '#') {
-        break;
-      }
-      at = next;
-    }
-
-    const backward = rotateClockwise(rotateClockwise(forward));
-    while (true) {
-      rays.set(at[0], at[1], rays.get(at[0], at[1]) | DIRECTION_TO_FLAG[forward]);
-      const next = moveInDirection(at, backward);
-      if (grid.tryGetChar(next[0], next[1], '#') === '#') {
-        break;
-      }
-      at = next;
-    }
-  };
-
   let position = start;
   let direction: Direction = '^';
   while (true) {
@@ -69,7 +48,7 @@ export async function solvePuzzleAdvanced() {
     }
     const next = moveInDirection(position, direction);
     if (visited.tryGetChar(next[0], next[1], ' ') === '#') {
-      fillBackwardRay(position, direction);
+      fillBackwardRay(grid, rays, position, direction);
       direction = rotateClockwise(direction);
     } else {
       if (rays.get(position[0], position[1]) & DIRECTION_TO_FLAG[rotateClockwise(direction)]) {
@@ -132,6 +111,32 @@ function moveInDirection(position: Vector, direction: Direction): Vector {
     case '<': return [row, column - 1];
   }
 }
+
+function fillBackwardRay(
+  grid: Grid,
+  rays: Grid,
+  from: Vector,
+  forward: Direction
+): void {
+  let at = from;
+  while (true) {
+    const next = moveInDirection(at, forward);
+    if (grid.tryGetChar(next[0], next[1], '#') === '#') {
+      break;
+    }
+    at = next;
+  }
+
+  const backward = rotateClockwise(rotateClockwise(forward));
+  while (true) {
+    rays.set(at[0], at[1], rays.get(at[0], at[1]) | DIRECTION_TO_FLAG[forward]);
+    const next = moveInDirection(at, backward);
+    if (grid.tryGetChar(next[0], next[1], '#') === '#') {
+      break;
+    }
+    at = next;
+  }
+};
 
 enum DirectionFlag {
   Up = 1,
