@@ -33,50 +33,82 @@ export async function solvePuzzleBasic() {
 }
 
 export async function solvePuzzleAdvanced() {
-  const content = await readFile(getDataPath('input/puzzle06.txt'), {encoding: 'utf8'});
+  const content = await readFile(getDataPath('input/puzzle06_test.txt'), {encoding: 'utf8'});
 
   const grid = Grid.fromLines(content.split(/\r?\n/g).filter(line => line));
   const start = findStart(grid);
-  let visited = grid.clone();
-  let rays = Grid.empty(grid.rows, grid.columns);
+  const visited = grid.clone();
+  const rays = {
+    '^': Grid.empty(grid.rows, grid.columns),
+    '>': Grid.empty(grid.rows, grid.columns),
+    'v': Grid.empty(grid.rows, grid.columns),
+    '<': Grid.empty(grid.rows, grid.columns),
+  } as const;
 
-  let position = start;
-  let direction: Direction = '^';
-  while (true) {
-    if (!visited.trySetChar(position[0], position[1], 'X')) {
-      break;
-    }
-    const next = moveInDirection(position, direction);
-    if (visited.tryGetChar(next[0], next[1], ' ') === '#') {
-      fillBackwardRay(grid, rays, position, direction);
-      direction = rotateClockwise(direction);
-    } else {
-      if (rays.get(position[0], position[1]) & DIRECTION_TO_FLAG[rotateClockwise(direction)]) {
-        rays.set(next[0], next[1], rays.get(next[0], next[1]) | STOP_FLAG);
+  const exploreCycle = (from: Vector, fromDirection: Direction): RayState.ToCycle | RayState.ToFree => {
+    const explored: Array<readonly [Vector, Direction]> = [];
+    const startDirection = rotateClockwise(fromDirection);
+    const start = moveInDirection(from, startDirection);
+    let result: RayState.ToCycle | RayState.ToFree = RayState.ToFree;
+    for (const [at, direction] of walkGrid(grid, start, startDirection)) {
+      explored.push([at, direction]);
+      const directedRays = rays[direction];
+      const state = directedRays.get(at[0], at[1]);
+      if (state) {
+        result = state === RayState.Exploring ? RayState.ToCycle : state;
+        break;
       }
-      position = next;
+      directedRays.set(at[0], at[1], RayState.Exploring);
+    }
+    console.log(`explored ${explored.map(([p, d]) => `${p[0]},${p[1]}:${d}`).join(' ')}`);
+    return result;
+  };
+
+  const markCycle = (from: Vector, fromDirection: Direction, mark: RayState.ToCycle | RayState.ToFree): void => {
+    const marked: Array<readonly [Vector, Direction]> = [];
+    const startDirection = rotateClockwise(fromDirection);
+    const start = moveInDirection(from, startDirection);
+    for (const [at, direction] of walkGrid(grid, start, startDirection)) {
+      marked.push([at, direction]);
+      const directedRays = rays[direction];
+      const state = directedRays.get(at[0], at[1]);
+      if (state !== RayState.Exploring) {
+        break;
+      }
+      directedRays.set(at[0], at[1], mark);
+    }
+    console.log(`  marked ${marked.map(([p, d]) => `${p[0]},${p[1]}:${d}`).join(' ')}`);
+  };
+
+  for (const [at, direction] of walkGrid(grid, start, '^')) {
+    console.log(`walk ${at.join(',')} ${direction}`);
+    const exploreState = exploreCycle(at, direction);
+    markCycle(at, direction, exploreState);
+    console.log(`found ${RayState[exploreState]}`);
+    if (exploreState === RayState.ToCycle) {
+      const next = moveInDirection(at, direction);
+      visited.setChar(next[0], next[1], 'O');
     }
   }
 
-  const gridWithRays = grid.clone();
-  for (let i = 0; i < rays.rows; i++) {
-    for (let j = 0; j < rays.columns; j++) {
-      const ray = rays.get(i, j);
-      if (ray) {
-        gridWithRays.setChar(i, j, FLAG_TO_CHAR[ray] ?? '?');
-      }
-    }
-  }
+  // const visitedWithRays = visited.clone();
+  // for (let i = 0; i < visited.rows; i++) {
+  //   for (let j = 0; j < visited.columns; j++) {
+  //     const ch = visited.getChar(i, j);
+  //     if (ch === '.') {
+  //     }
+  //   }
+  // }
 
   await writeFile(
     getDataPath('output/puzzle06_rays.txt'),
-    Array.from(gridWithRays.enumerateLines(), line => line + '\n').join(''),
+    Array.from(visited.enumerateLines(), line => line + '\n').join(''),
     {encoding: 'utf8'}
   );
 
-  rays.set(start[0], start[1], rays.get(start[0], start[1]) & ~STOP_FLAG & 0xFFFF);
+  // rays.set(start[0], start[1], rays.get(start[0], start[1]) & ~STOP_FLAG & 0xFFFF);
   // 446 is too low
-  console.log(`Puzzle 06 (advanced): ${rays.count(v => Boolean(v & STOP_FLAG))}`);
+  console.log(`Puzzle 06 (advanced): ${visited.count(v => v === 'O'.charCodeAt(0))}`);
 }
 
 type Vector = readonly [row: number, column: number];
@@ -112,46 +144,66 @@ function moveInDirection(position: Vector, direction: Direction): Vector {
   }
 }
 
-function fillBackwardRay(
-  grid: Grid,
-  rays: Grid,
-  from: Vector,
-  forward: Direction
-): void {
-  let at = from;
-  while (true) {
-    const next = moveInDirection(at, forward);
-    if (grid.tryGetChar(next[0], next[1], '#') === '#') {
-      break;
-    }
-    at = next;
-  }
+// function fillBackwardRay(
+//   grid: Grid,
+//   rays: Grid,
+//   from: Vector,
+//   forward: Direction
+// ): void {
+//   let at = from;
+//   while (true) {
+//     const next = moveInDirection(at, forward);
+//     if (grid.tryGetChar(next[0], next[1], '#') === '#') {
+//       break;
+//     }
+//     at = next;
+//   }
 
-  const backward = rotateClockwise(rotateClockwise(forward));
+//   const backward = rotateClockwise(rotateClockwise(forward));
+//   while (true) {
+//     rays.set(at[0], at[1], rays.get(at[0], at[1]) | DIRECTION_TO_FLAG[forward]);
+//     const next = moveInDirection(at, backward);
+//     if (grid.tryGetChar(next[0], next[1], '#') === '#') {
+//       break;
+//     }
+//     at = next;
+//   }
+// };
+
+enum RayState {
+  Exploring = 1,
+  ToCycle = 2,
+  ToFree = 3,
+}
+
+function* walkGrid(grid: Grid, from: Vector, fromDirection: Direction): Iterable<[Vector, Direction]> {
+  let at = from;
+  let direction = fromDirection;
   while (true) {
-    rays.set(at[0], at[1], rays.get(at[0], at[1]) | DIRECTION_TO_FLAG[forward]);
-    const next = moveInDirection(at, backward);
-    if (grid.tryGetChar(next[0], next[1], '#') === '#') {
-      break;
+    yield [at, direction];
+    const next = moveInDirection(at, direction);
+    switch (grid.tryGetChar(next[0], next[1], ' ')) {
+      case ' ': {
+        return;
+      }
+      case '#': {
+        direction = rotateClockwise(direction);
+        break;
+      }
+      default: {
+        at = next;
+        break;
+      }
     }
-    at = next;
   }
 };
 
-enum DirectionFlag {
-  Up = 1,
-  Right = 2,
-  Down = 4,
-  Left = 8
-}
-const STOP_FLAG = 16;
-
-const DIRECTION_TO_FLAG = {
-  '^': DirectionFlag.Up,
-  '>': DirectionFlag.Right,
-  'v': DirectionFlag.Down,
-  '<': DirectionFlag.Left,
-} as const;
+// const DIRECTION_TO_FLAG = {
+//   '^': DirectionFlag.Up,
+//   '>': DirectionFlag.Right,
+//   'v': DirectionFlag.Down,
+//   '<': DirectionFlag.Left,
+// } as const;
 
 const FLAG_TO_CHAR = '.^>┐v|┘├<┌-┴└┤┬┼OÄ»╗Ü║╝╠«╔═╩╚╣╦╬Ø';
 
