@@ -1,16 +1,7 @@
 {
-  "compilerOptions": {
-    "target": "ES2021",
-    "module": "NodeNext",
-    "esModuleInterop": true,
-
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "outDir": "./dist",
-
-    "forceConsistentCasingInFileNames": true,
-    "strict": true,
-    "skipLibCheck": true,
-    "noFallthroughCasesInSwitch": true
-  }
+    "files": [],
+    "references": [
+        { "path": "./src/browser/tsconfig.browser.json" },
+        { "path": "./tsconfig.node.json" }
+    ]
 }
