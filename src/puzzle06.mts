@@ -43,7 +43,7 @@ export async function solvePuzzleAdvanced() {
 
   const exploreCycle = (from: Vector, fromDirection: Direction): boolean => {
     const obstacleAt = moveInDirection(from, fromDirection);
-    const previousAtObstacle = grid.get(obstacleAt[0], obstacleAt[1]);
+    const previousAtObstacle = grid.tryGet(obstacleAt[0], obstacleAt[1], ' ');
     if (previousAtObstacle !== '.') {
       return false;
     }
@@ -51,10 +51,8 @@ export async function solvePuzzleAdvanced() {
 
     explored.fill(0);
 
-    const startDirection = rotateClockwise(fromDirection);
-    const start = moveInDirection(from, startDirection);
     let foundCycle = false;
-    for (const [at, direction] of walkGrid(grid, start, startDirection)) {
+    for (const [at, direction] of walkGrid(grid, from, fromDirection)) {
       const state = explored.get(at[0], at[1]);
       const directionFlag = DIRECTION_TO_FLAG[direction];
       if (state & directionFlag) {
@@ -71,34 +69,40 @@ export async function solvePuzzleAdvanced() {
     return foundCycle;
   };
 
+  let outputCycle = false;
+
   const obstacles = grid.clone();
   const startTime = performance.now();
   let steps = 0;
   for (const [at, direction] of walkGrid(grid, start, '^')) {
     steps++;
-    if (exploreCycle(at, direction)) {
+    const next = moveInDirection(at, direction);
+    // Check that we don't block previously visited path
+    if (obstacles.tryGet(next[0], next[1], ' ') === '.' && exploreCycle(at, direction)) {
       const obstacleAt = moveInDirection(at, direction);
       obstacles.set(obstacleAt[0], obstacleAt[1], 'O');
 
-      // const cycle = grid.clone();
-      // for (let i = 0; i < obstacles.rows; i++) {
-      //   for (let j = 0; j < obstacles.columns; j++) {
-      //     let flags = explored.get(i, j);
-      //     if (i === obstacleAt[0] && j === obstacleAt[1]) {
-      //       flags |= ExploreFlag.Obstacle;
-      //     }
-      //     if (flags) {
-      //       cycle.set(i, j, FLAG_TO_CHAR[flags] ?? '?');
-      //     }
-      //   }
-      // }
-      // cycle.set(at[0], at[1], 'S');
-      // await writeFile(
-      //   getDataPath('output/puzzle06_cycle.txt'),
-      //   Array.from(cycle.lines()).join(''),
-      //   {encoding: 'utf8'}
-      // );
-      // void 0;
+      if (outputCycle) {
+        const cycle = grid.clone();
+        for (let i = 0; i < obstacles.rows; i++) {
+          for (let j = 0; j < obstacles.columns; j++) {
+            let flags = explored.get(i, j);
+            if (i === obstacleAt[0] && j === obstacleAt[1]) {
+              flags |= ExploreFlag.Obstacle;
+            }
+            if (flags) {
+              cycle.set(i, j, FLAG_TO_CHAR[flags] ?? '?');
+            }
+          }
+        }
+        cycle.set(at[0], at[1], 'S');
+        await writeFile(
+          getDataPath('output/puzzle06_cycle.txt'),
+          Array.from(cycle.lines()).join(''),
+          {encoding: 'utf8'}
+        );
+        void 0;
+      }
     }
     if (obstacles.get(at[0], at[1]) === '.') {
       obstacles.set(at[0], at[1], direction);
@@ -116,6 +120,7 @@ export async function solvePuzzleAdvanced() {
 
   // 446 is too low
   // 1798 is too high
+  // 1774 is incorrect
   console.log(`Puzzle 06 (advanced): ${obstacles.count(v => v === 'O')}`);
 }
 
@@ -153,6 +158,9 @@ function moveInDirection(position: Vector, direction: Direction): Vector {
 }
 
 function* walkGrid(grid: CharGrid, from: Vector, fromDirection: Direction): Iterable<[Vector, Direction]> {
+  if (!grid.valid(from[0], from[1])) {
+    return;
+  }
   let at = from;
   let direction = fromDirection;
   while (true) {

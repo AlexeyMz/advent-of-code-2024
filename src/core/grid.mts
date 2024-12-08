@@ -22,7 +22,14 @@ abstract class BaseGrid<T, Self extends BaseGrid<T, Self>> {
   protected abstract wrap(value: T): number;
   protected abstract unwrap(num: number): T;
 
+  valid(row: number, column: number): boolean {
+    return row >= 0 && row < this.rows && column >= 0 && column < this.columns;
+  }
+
   get(row: number, column: number): T {
+    if (!(row >= 0 && row < this.rows && column >= 0 && column < this.columns)) {
+      throw new Error('Grid: trying to get out of bounds');
+    }
     return this.unwrap(this.data[row * this.columns + column]);
   }
 
@@ -34,6 +41,9 @@ abstract class BaseGrid<T, Self extends BaseGrid<T, Self>> {
   }
 
   set(row: number, column: number, value: T): void {
+    if (!(row >= 0 && row < this.rows && column >= 0 && column < this.columns)) {
+      throw new Error('Grid: trying to set out of bounds');
+    }
     this.data[row * this.columns + column] = this.wrap(value);
   }
 
@@ -59,10 +69,10 @@ abstract class BaseGrid<T, Self extends BaseGrid<T, Self>> {
     return count;
   }
 
-  map(mapper: (value: number) => number): Self {
+  map(mapper: (value: T) => T): Self {
     const data = new Uint16Array(this.data.length);
     for (let i = 0; i < data.length; i++) {
-      data[i] = mapper(this.data[i]);
+      data[i] = this.wrap(mapper(this.unwrap(this.data[i])));
     }
     return this.create(this.rows, this.columns, data);
   }
