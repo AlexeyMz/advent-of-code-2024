@@ -1,0 +1,29 @@
+.canvas {
+    flex: auto;
+    width: 0;
+    display: flex;
+    position: relative;
+    cursor: default;
+    background: #fff;
+}
+
+.canvasArea {
+    flex: auto;
+    overflow: scroll;
+    touch-action: pan-x pan-y;
+
+    /* For Firefox */
+    scrollbar-width: none;
+    /* For Safari, Chrome, etc */
+    &::-webkit-scrollbar {
+      display: none;
+    }
+}
+
+.panning {
+    cursor: grabbing;
+}
+
+.paper {
+    position: relative;
+}

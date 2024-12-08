@@ -11,7 +11,10 @@ import {
 import { Vector, Rect, fitRectKeepingAspectRatio } from './geometry';
 import { Paper, PaperTransform, PaperCell } from './paper';
 
+import styles from './canvas.module.css';
+
 export interface PaperAreaProps {
+    className?: string;
     cellStrategy: CanvasCellStrategy<any>;
     zoomOptions?: ZoomOptions;
     viewport?: React.ReactNode;
@@ -65,7 +68,6 @@ interface ViewportAnimation {
     readonly cancellation: AbortController;
 }
 
-const CLASS_NAME = 'reactodia-paper-area';
 const DEFAULT_ANIMATION_DURATION = 500;
 const LEFT_MOUSE_BUTTON = 0;
 
@@ -155,12 +157,12 @@ export class PaperArea extends React.Component<PaperAreaProps, State> implements
     }
 
     render() {
-        const {viewport, children} = this.props;
+        const {className, viewport, children} = this.props;
         const paperTransform = this.metrics.getTransform();
 
         return (
-            <div className={CLASS_NAME}>
-                <div className={`${CLASS_NAME}__area`}
+            <div className={`${styles.canvas} ${className ?? ''}`}>
+                <div className={styles.canvasArea}
                     ref={this.onAreaMount}
                     onPointerDown={this.onAreaPointerDown}>
                     <Paper cellStrategy={this.strategy}
@@ -391,7 +393,7 @@ export class PaperArea extends React.Component<PaperAreaProps, State> implements
         } else if (target === undefined) {
             e.preventDefault();
             if (panningOrigin) {
-                this.area.classList.add(`${CLASS_NAME}--panning`);
+                this.area.classList.add(styles.panning);
                 this.area.scrollLeft = panningOrigin.scrollLeft - pageOffsetX;
                 this.area.scrollTop = panningOrigin.scrollTop - pageOffsetY;
             }
@@ -489,7 +491,7 @@ export class PaperArea extends React.Component<PaperAreaProps, State> implements
         this.movingState = undefined;
 
         if (movingState) {
-            this.area.classList.remove(`${CLASS_NAME}--panning`);
+            this.area.classList.remove(styles.panning);
             document.removeEventListener('pointermove', this.onPointerMove);
             document.removeEventListener('pointerup', this.onPointerUp);
             document.removeEventListener('pointercancel', this.onPointerCancel);

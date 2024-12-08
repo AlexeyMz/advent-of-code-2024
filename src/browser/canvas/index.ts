@@ -1,8 +1,8 @@
 export * from './canvasApi';
 export * from './events';
-export { Rect, Vector, Size } from './geometry';
+export { Rect, Vector, type Size } from './geometry';
 export {
-  Paper, PaperTransform, CanvasSvgLayer, CanvasHtmlLayer,
+  Paper, type PaperTransform, CanvasSvgLayer, CanvasHtmlLayer,
   paneFromPaperCoords, paperFromPaneCoords, paneTopLeft, totalPaneSize,
 } from './paper';
-export { PaperArea, PaperAreaProps } from './paperArea';
+export { PaperArea, type PaperAreaProps } from './paperArea';

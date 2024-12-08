@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 
 import { CanvasHtmlLayer, EmptyCellStrategy, PaperArea, Rect, Size } from '../canvas';
 
-import './day06.css';
+import styles from './day06.module.css';
 
 function Day06() {
   const [cellStrategy] = React.useState(() => new GridCellStrategy());
@@ -11,7 +11,7 @@ function Day06() {
   return (
     <PaperArea cellStrategy={cellStrategy}>
       <CanvasHtmlLayer>
-
+        <div className={styles.abc}>ABC</div>
       </CanvasHtmlLayer>
     </PaperArea>
   );

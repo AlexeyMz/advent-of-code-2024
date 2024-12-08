@@ -3,9 +3,9 @@ import * as React from 'react';
 import type { CanvasCellStrategy } from './canvasApi';
 import { Vector } from './geometry';
 
-export type PaperCell = { readonly paperCellBrand: void };
+import styles from './canvas.module.css';
 
-const CLASS_NAME = 'reactodia-paper';
+export type PaperCell = { readonly paperCellBrand: void };
 
 export function Paper(props: {
     cellStrategy: CanvasCellStrategy<PaperCell>;
@@ -56,7 +56,7 @@ export function Paper(props: {
     } : undefined;
 
     return (
-        <div className={CLASS_NAME}
+        <div className={styles.paper}
             style={style}
             onPointerDown={handlePointerDown}
             onContextMenu={handleContextMenu}
@@ -104,6 +104,7 @@ const TRANSFORMED_SVG_CANVAS_STYLE: Readonly<React.CSSProperties> = {
     position: 'absolute',
     top: 0,
     left: 0,
+    overflow: 'visible',
 };
 
 /**

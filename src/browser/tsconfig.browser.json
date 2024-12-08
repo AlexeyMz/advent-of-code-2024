@@ -4,6 +4,7 @@
         "module": "ESNext",
 
         "moduleResolution": "bundler",
+        "isolatedModules": true,
         "allowImportingTsExtensions": true,
         "moduleDetection": "force",
         "noEmit": true,
