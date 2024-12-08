@@ -133,175 +133,21 @@ export namespace Rect {
     }
 }
 
-function intersectRayFromRectangleCenter(sourceRect: Rect, rayTarget: Vector) {
-    const isTargetInsideRect =
-        sourceRect.width === 0 || sourceRect.height === 0 ||
-        rayTarget.x > sourceRect.x && rayTarget.x < (sourceRect.x + sourceRect.width) &&
-        rayTarget.y > sourceRect.y && rayTarget.y < (sourceRect.y + sourceRect.height);
-
-    const halfWidth = sourceRect.width / 2;
-    const halfHeight = sourceRect.height / 2;
-    const center = {
-        x: sourceRect.x + halfWidth,
-        y: sourceRect.y + halfHeight,
-    };
-    if (isTargetInsideRect) {
-        return center;
-    }
-
-    const direction = Vector.normalize({
-        x: rayTarget.x - center.x,
-        y: rayTarget.y - center.y,
-    });
-
-    const rightDirection = {x: Math.abs(direction.x), y: direction.y};
-    const isHorizontal =
-        Vector.cross2D({x: halfWidth, y: -halfHeight}, rightDirection) > 0 &&
-        Vector.cross2D({x: halfWidth, y: halfHeight}, rightDirection) < 0;
-
-    if (isHorizontal) {
-        return {
-            x: center.x + halfWidth * Math.sign(direction.x),
-            y: center.y + halfWidth * direction.y / Math.abs(direction.x),
-        };
-    } else {
-        return {
-            x: center.x + halfHeight * direction.x / Math.abs(direction.y),
-            y: center.y + halfHeight * Math.sign(direction.y),
-        };
-    }
-}
-
-/**
- * Returns `true` is two line geometries (vertex sequences) are the same,
- * otherwise `false`.
- *
- * @category Geometry
- */
-export function isPolylineEqual(left: ReadonlyArray<Vector>, right: ReadonlyArray<Vector>) {
-    if (left === right) { return true; }
-    if (left.length !== right.length) { return false; }
-    for (let i = 0; i < left.length; i++) {
-        const a = left[i];
-        const b = right[i];
-        if (!(a.x === b.x && a.y === b.y)) {
-            return false;
-        }
-    }
-    return true;
-}
-
-/**
- * Computes line geometry between two rectangles clipped at each
- * rectangle border with intermediate points in-between.
- *
- * It is assumed that the line starts at source rectangle center,
- * ends at target rectangle center and goes through each vertex in the array.
- *
- * @category Geometry
- */
-export function computePolyline(
-    sourceRect: Rect,
-    targetRect: Rect,
-    vertices: ReadonlyArray<Vector>
-): Vector[] {
-    const startPoint = intersectRayFromRectangleCenter(
-        sourceRect, vertices.length > 0 ? vertices[0] : Rect.center(targetRect));
-    const endPoint = intersectRayFromRectangleCenter(
-        targetRect, vertices.length > 0 ? vertices[vertices.length - 1] : Rect.center(sourceRect));
-    return [startPoint, ...vertices, endPoint];
-}
-
-/**
- * Computes length of linear line geometry.
- *
- * @category Geometry
- * @see getPointAlongPolyline()
- */
-export function computePolylineLength(polyline: ReadonlyArray<Vector>): number {
-    let previous: Vector;
-    return polyline.reduce((acc, point) => {
-        const segmentLength = previous ? Vector.length({x: point.x - previous.x, y: point.y - previous.y}) : 0;
-        previous = point;
-        return acc + segmentLength;
-    }, 0);
-}
-
-/**
- * Computes position at the specified `offset` along a linear line geometry
- * relative to the start of the line.
- *
- * If `offset` value is less than 0 or greater than line geometry length,
- * the the first or last point of the line will be returned correspondingly.
- *
- * @category Geometry
- * @see computePolylineLength()
- */
-export function getPointAlongPolyline(polyline: ReadonlyArray<Vector>, offset: number): Vector {
-    if (polyline.length === 0) {
-        throw new Error('Cannot compute a point for an empty polyline');
-    }
-    if (offset < 0) {
-        return polyline[0];
-    }
-    let currentOffset = 0;
-    for (let i = 1; i < polyline.length; i++) {
-        const previous = polyline[i - 1];
-        const point = polyline[i];
-        const segment = {x: point.x - previous.x, y: point.y - previous.y};
-        const segmentLength = Vector.length(segment);
-        const newOffset = currentOffset + segmentLength;
-        if (offset < newOffset) {
-            const leftover = (offset - currentOffset) / segmentLength;
-            return {
-                x: previous.x + leftover * segment.x,
-                y: previous.y + leftover * segment.y,
-            };
-        } else {
-            currentOffset = newOffset;
-        }
-    }
-    return polyline[polyline.length - 1];
-}
-
-/**
- * Searches for a closest segment of a linear line geometry.
- *
- * @returns index of start point for the closes line segment, or 0 if line is empty.
- * @category Geometry
- * @see getPointAlongPolyline()
- */
-export function findNearestSegmentIndex(polyline: ReadonlyArray<Vector>, location: Vector): number {
-    let minDistance = Infinity;
-    let foundIndex = 0;
-
-    for (let i = 0; i < polyline.length - 1; i++) {
-        const pivot = polyline[i];
-        const next = polyline[i + 1];
-
-        const target = {x: location.x - pivot.x, y: location.y - pivot.y};
-        const segment = {x: next.x - pivot.x, y: next.y - pivot.y};
-        const segmentLength = Vector.length(segment);
-
-        const projectionToSegment = Vector.dot(target, segment) / segmentLength;
-        if (projectionToSegment < 0 || projectionToSegment > segmentLength) {
-            continue;
-        }
-
-        const distanceToSegment = Math.abs(Vector.cross2D(target, segment)) / segmentLength;
-        if (distanceToSegment < minDistance) {
-            minDistance = distanceToSegment;
-            foundIndex = i;
-        }
-    }
-    return foundIndex;
-}
-
-/**
- * Converts linear line geometry into an SVG path.
- *
- * @category Geometry
- */
-export function pathFromPolyline(polyline: ReadonlyArray<Vector>): string {
-    return 'M' + polyline.map(({x, y}) => `${x},${y}`).join(' L');
+export function fitRectKeepingAspectRatio(
+  sourceWidth: number,
+  sourceHeight: number,
+  targetWidth: number | undefined,
+  targetHeight: number | undefined,
+): { width: number; height: number } {
+  if (!(typeof targetWidth === 'number' || typeof targetHeight === 'number')) {
+      return {width: sourceWidth, height: sourceHeight};
+  }
+  const sourceAspectRatio = sourceWidth / sourceHeight;
+  targetWidth = typeof targetWidth === 'number' ? targetWidth : targetHeight! * sourceAspectRatio;
+  targetHeight = typeof targetHeight === 'number' ? targetHeight : targetWidth / sourceAspectRatio;
+  if (targetHeight * sourceAspectRatio <= targetWidth) {
+      return {width: targetHeight * sourceAspectRatio, height: targetHeight};
+  } else {
+      return {width: targetWidth, height: targetWidth / sourceAspectRatio};
+  }
 }

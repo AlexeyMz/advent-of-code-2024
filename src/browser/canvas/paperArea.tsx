@@ -4,18 +4,18 @@ import { EventObserver, Events, EventSource } from './events';
 import { Debouncer, animateInterval, easeInOutBezier } from './scheduler';
 
 import {
-    CanvasContext, CanvasApi, CanvasEvents, CanvasMetrics, CanvasAreaMetrics,
-    CanvasDropEvent, CenterToOptions, ScaleOptions, ViewportOptions, CanvasWidgetDescription,
-    CanvasPointerMode, ZoomOptions,
+    CanvasApi, CanvasEvents, CanvasMetrics, CanvasAreaMetrics,
+    CanvasDropEvent, CenterToOptions, ScaleOptions, ViewportOptions,
+    CanvasPointerMode, ZoomOptions, CanvasCellStrategy,
 } from './canvasApi';
-import { Vector, Rect } from './geometry';
-import { Paper, PaperTransform } from './paper';
-import { MutableRenderingState } from './renderingState';
+import { Vector, Rect, fitRectKeepingAspectRatio } from './geometry';
+import { Paper, PaperTransform, PaperCell } from './paper';
 
 export interface PaperAreaProps {
-    renderingState: MutableRenderingState;
+    cellStrategy: CanvasCellStrategy<any>;
     zoomOptions?: ZoomOptions;
-    children?: React.ReactNode;
+    viewport?: React.ReactNode;
+    children: React.ReactNode;
 }
 
 interface State {
@@ -31,7 +31,7 @@ interface State {
 interface PointerMoveState {
     pointers: Map<number, Vector>;
     pointerMoved: boolean;
-    target: HTMLElement | undefined;
+    target: PaperCell | undefined;
     originPointerId: number;
     origin: {
         readonly pageX: number;
@@ -41,11 +41,11 @@ interface PointerMoveState {
         readonly scrollLeft: number;
         readonly scrollTop: number;
     } | undefined;
-    movingElementOrigin: {
+    movingCellOrigin: {
+        readonly cellX: number;
+        readonly cellY: number;
         readonly pointerX: number;
         readonly pointerY: number;
-        readonly elementX: number;
-        readonly elementY: number;
     } | undefined;
     pinchOrigin: {
         readonly pointers: ReadonlyMap<number, Vector>;
@@ -77,7 +77,6 @@ export class PaperArea extends React.Component<PaperAreaProps, State> implements
     private area!: HTMLDivElement;
 
     private readonly pageSize = {x: 1500, y: 800};
-    private readonly canvasContext: CanvasContext;
 
     private viewportAnimation: ViewportAnimation | undefined;
 
@@ -134,8 +133,8 @@ export class PaperArea extends React.Component<PaperAreaProps, State> implements
         };
     }
 
-    get renderingState(): MutableRenderingState {
-        return this.props.renderingState;
+    private get strategy(): CanvasCellStrategy<PaperCell> {
+        return this.props.cellStrategy;
     }
 
     get pointerMode(): CanvasPointerMode {
@@ -156,42 +155,24 @@ export class PaperArea extends React.Component<PaperAreaProps, State> implements
     }
 
     render() {
-        const {children} = this.props;
+        const {viewport, children} = this.props;
         const paperTransform = this.metrics.getTransform();
 
         return (
-            <CanvasContext.Provider value={this.canvasContext}>
-                <div className={CLASS_NAME}>
-                    <div className={`${CLASS_NAME}__area`}
-                        ref={this.onAreaMount}
-                        onPointerDown={this.onAreaPointerDown}>
-                        <Paper paperTransform={paperTransform}
-                            onPointerDown={this.onPaperPointerDown}
-                            onContextMenu={this.onContextMenu}
-                            onScrollCapture={this.onPaperScrollCapture}
-                            linkLayerWidgets={
-                                <div className={`${CLASS_NAME}__widgets`}
-                                    onPointerDown={this.onWidgetsPointerDown}>
-                                    {renderedWidgets
-                                        .filter(w => w.attachment === 'overLinks')
-                                        .map(widget => ensureWidgetGetRendered(widget.element))
-                                    }
-                                </div>
-                            }
-                            elementLayerWidgets={
-                                <div className={`${CLASS_NAME}__widgets`}
-                                    onPointerDown={this.onWidgetsPointerDown}>
-                                    {renderedWidgets
-                                        .filter(w => w.attachment === 'overElements')
-                                        .map(widget => ensureWidgetGetRendered(widget.element))
-                                    }
-                                </div>
-                            }
-                        />
-                    </div>
-                    {children}
+            <div className={CLASS_NAME}>
+                <div className={`${CLASS_NAME}__area`}
+                    ref={this.onAreaMount}
+                    onPointerDown={this.onAreaPointerDown}>
+                    <Paper cellStrategy={this.strategy}
+                        paperTransform={paperTransform}
+                        onPointerDown={this.onPaperPointerDown}
+                        onContextMenu={this.onContextMenu}
+                        onScrollCapture={this.onPaperScrollCapture}
+                        layers={children}
+                    />
                 </div>
-            </CanvasContext.Provider>
+                {viewport}
+            </div>
         );
     }
 
@@ -200,7 +181,7 @@ export class PaperArea extends React.Component<PaperAreaProps, State> implements
     };
 
     componentDidMount() {
-        this.forceAdjustPaper(() => this.centerTo());
+        this.forceAdjustArea(() => this.centerTo());
 
         this.area.addEventListener('dragover', this.onDragOver);
         this.area.addEventListener('drop', this.onDragDrop);
@@ -243,10 +224,8 @@ export class PaperArea extends React.Component<PaperAreaProps, State> implements
     };
 
     /** Returns bounding box of paper content in paper coordinates. */
-    private getContentFittingBox() {
-        const {model, renderingState} = this.props;
-        const {elements, links} = model;
-        return getContentFittingBox(elements, links, renderingState);
+    private getContentFittingBox(): Rect {
+        return this.strategy.getContentBounds();
     }
 
     private computeAdjustedBox(): Pick<State, 'width' | 'height' | 'originX' | 'originY'> {
@@ -277,11 +256,11 @@ export class PaperArea extends React.Component<PaperAreaProps, State> implements
         return {width, height, originX, originY};
     }
 
-    scheduleAdjustPaper = (): void => {
-        this.delayedPaperAdjust.call(this.forceAdjustPaper);
+    scheduleAdjustArea = (): void => {
+        this.delayedPaperAdjust.call(this.forceAdjustArea);
     };
 
-    forceAdjustPaper = (callback?: () => void): void => {
+    forceAdjustArea = (callback?: () => void): void  =>{
         const {clientWidth, clientHeight} = this.area;
         const adjusted = {
             ...this.computeAdjustedBox(),
@@ -314,7 +293,7 @@ export class PaperArea extends React.Component<PaperAreaProps, State> implements
         }
     };
 
-    private onPaperPointerDown = (e: React.PointerEvent<HTMLElement>, cell: HTMLElement | undefined) => {
+    private onPaperPointerDown = (e: React.PointerEvent<HTMLElement>, cell: PaperCell | undefined) => {
         if (e.button !== LEFT_MOUSE_BUTTON) {
             return;
         }
@@ -325,7 +304,7 @@ export class PaperArea extends React.Component<PaperAreaProps, State> implements
         }
 
         let panningOrigin: PointerMoveState['panningOrigin'];
-        let movingElementOrigin: PointerMoveState['movingElementOrigin'];
+        let movingCellOrigin: PointerMoveState['movingCellOrigin'];
 
         if (cell || e.pointerType === 'mouse') {
             // keep default panning on touch
@@ -338,12 +317,10 @@ export class PaperArea extends React.Component<PaperAreaProps, State> implements
                 panningOrigin = {scrollLeft, scrollTop};
                 clearTextSelectionInArea();
             }
-        } else if (cell instanceof Element) {
-            if (this.shouldStartElementMove(e)) {
-                const {x: pointerX, y: pointerY} = this.metrics.pageToPaperCoords(e.pageX, e.pageY);
-                const {x: elementX, y: elementY} = cell.position;
-                movingElementOrigin = {pointerX, pointerY, elementX, elementY};
-            }
+        } else if (e.pointerType === 'mouse' && this.strategy.shouldMove(cell)) {
+            const {x: pointerX, y: pointerY} = this.metrics.pageToPaperCoords(e.pageX, e.pageY);
+            const {x: cellX, y: cellY} = this.strategy.getCellPosition(cell);
+            movingCellOrigin = {pointerX, pointerY, cellX, cellY};
         }
 
         const {pageX, pageY} = e;
@@ -354,7 +331,7 @@ export class PaperArea extends React.Component<PaperAreaProps, State> implements
             originPointerId: e.pointerId,
             origin: {pageX, pageY},
             panningOrigin,
-            movingElementOrigin,
+            movingCellOrigin,
             pinchOrigin: undefined,
         };
         this.handleMultiPointerDown(e);
@@ -397,15 +374,10 @@ export class PaperArea extends React.Component<PaperAreaProps, State> implements
         );
     }
 
-    private shouldStartElementMove(e: React.PointerEvent) {
-        return e.pointerType === 'mouse';
-    }
-
     private onPointerMove = (e: PointerEvent) => {
         if (!this.movingState || this.scrollBeforeUpdate) { return; }
-        const {renderingState} = this.props;
 
-        const {origin, target, panningOrigin, movingElementOrigin} = this.movingState;
+        const {origin, target, panningOrigin, movingCellOrigin} = this.movingState;
         const pageOffsetX = e.pageX - origin.pageX;
         const pageOffsetY = e.pageY - origin.pageY;
         if (e.isPrimary && Math.abs(pageOffsetX) >= 1 && Math.abs(pageOffsetY) >= 1) {
@@ -416,7 +388,7 @@ export class PaperArea extends React.Component<PaperAreaProps, State> implements
 
         if (this.handleMultiPointerMove(e)) {
             /* pinch zoom */
-        } else if (typeof target === 'undefined') {
+        } else if (target === undefined) {
             e.preventDefault();
             if (panningOrigin) {
                 this.area.classList.add(`${CLASS_NAME}--panning`);
@@ -424,30 +396,22 @@ export class PaperArea extends React.Component<PaperAreaProps, State> implements
                 this.area.scrollTop = panningOrigin.scrollTop - pageOffsetY;
             }
             this.source.trigger('pointerMove', {source: this, sourceEvent: e, target, panning});
-        } else if (target instanceof Element) {
+        } else {
             e.preventDefault();
-            if (movingElementOrigin) {
+            if (movingCellOrigin) {
                 const {x, y} = this.metrics.pageToPaperCoords(e.pageX, e.pageY);
-                const {pointerX, pointerY, elementX, elementY} = movingElementOrigin;
-                target.setPosition({
-                    x: elementX + x - pointerX,
-                    y: elementY + y - pointerY,
+                const {pointerX, pointerY, cellX, cellY} = movingCellOrigin;
+                this.strategy.setCellPosition(target, {
+                    x: cellX + x - pointerX,
+                    y: cellY + y - pointerY,
                 });
                 this.source.trigger('pointerMove', {source: this, sourceEvent: e, target, panning});
-                renderingState.syncUpdate();
+            } else {
+                const location = this.metrics.pageToPaperCoords(e.pageX, e.pageY);
+                const updatedTarget = this.strategy.updateMove(target, location);
+                this.movingState.target = updatedTarget;
+                this.source.trigger('pointerMove', {source: this, sourceEvent: e, target: updatedTarget, panning});
             }
-        } else if (target instanceof Link) {
-            e.preventDefault();
-            const location = this.metrics.pageToPaperCoords(e.pageX, e.pageY);
-            const linkVertex = this.generateLinkVertex(target, location);
-            linkVertex.createAt(location);
-            this.movingState.target = linkVertex;
-        } else if (target instanceof LinkVertex) {
-            e.preventDefault();
-            const location = this.metrics.pageToPaperCoords(e.pageX, e.pageY);
-            target.moveTo(location);
-            this.source.trigger('pointerMove', {source: this, sourceEvent: e, target, panning});
-            renderingState.syncUpdate();
         }
     };
 
@@ -513,8 +477,8 @@ export class PaperArea extends React.Component<PaperAreaProps, State> implements
         this.stopListeningToPointerMove();
     };
 
-    private onPaperScrollCapture = (e: React.UIEvent<HTMLElement>, cell: Cell | undefined) => {
-        if (cell instanceof Element && this.movingState) {
+    private onPaperScrollCapture = (e: React.UIEvent<HTMLElement>, cell: PaperCell | undefined) => {
+        if (this.movingState && cell && this.strategy.allowScrollCell(cell)) {
             // Prevent element move when interacting with nested scrollbars
             this.stopListeningToPointerMove();
         }
@@ -637,13 +601,8 @@ export class PaperArea extends React.Component<PaperAreaProps, State> implements
     }
 
     zoomToFit(options: ViewportOptions = {}): Promise<void> {
-        const {model, renderingState} = this.props;
-        const {elements} = model;
-        if (elements.length === 0) {
-            return this.centerTo();
-        }
-        const bbox = getContentFittingBox(elements, [], renderingState);
-        return this.zoomToFitRect(bbox, options);
+        const contentBounds = this.getContentFittingBox();
+        return this.zoomToFitRect(contentBounds, options);
     }
 
     zoomToFitRect(
@@ -696,7 +655,6 @@ export class PaperArea extends React.Component<PaperAreaProps, State> implements
     };
 
     private onDragDrop = (e: DragEvent) => {
-        const {renderingState} = this.props;
         const {x, y} = clientCoordsFor(this.area, e);
         const position = this.metrics.clientToPaperCoords(x, y);
         const event: CanvasDropEvent = {
@@ -704,18 +662,14 @@ export class PaperArea extends React.Component<PaperAreaProps, State> implements
             sourceEvent: e,
             position,
         };
-        if (renderingState.shared.tryHandleDropOnPaper(event)) {
-            /* skip trigger -- already handled */
-        } else {
-            this.source.trigger('drop', event);
-        }
+        this.source.trigger('drop', event);
     };
 
     private onScroll = (e: Event) => {
         this.source.trigger('scroll', {source: this, sourceEvent: e});
     };
 
-    private onContextMenu = (e: React.MouseEvent, cell: HTMLElement | undefined) => {
+    private onContextMenu = (e: React.MouseEvent, cell: PaperCell | undefined) => {
         this.source.trigger('contextMenu', {
             source: this,
             sourceEvent: e,

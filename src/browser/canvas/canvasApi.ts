@@ -2,8 +2,7 @@ import * as React from 'react';
 
 import { Events, PropertyChange } from './events';
 
-import type { RenderingState } from './renderingState';
-import type { Vector, Rect, Size } from './geometry';
+import { Vector, Rect, Size } from './geometry';
 import type { PaperTransform } from './paper';
 
 /**
@@ -16,10 +15,6 @@ export interface CanvasApi {
      * Events for the scrollable graph canvas.
      */
     readonly events: Events<CanvasEvents>;
-    /**
-     * Canvas-specific state for rendering graph content (elements, links, etc).
-     */
-    readonly renderingState: RenderingState;
     /**
      * Live state for the current viewport size and transformation.
      *
@@ -41,11 +36,11 @@ export interface CanvasApi {
     /**
      * TODO
      */
-    scheduleAdjustAreaSize(): void;
+    scheduleAdjustArea(): void;
     /**
      * TODO
      */
-    forceAdjustAreaSize(): void;
+    forceAdjustArea(): void;
     /**
      * Sets default action on moving pointer with pressed main button.
      */
@@ -109,31 +104,6 @@ export interface CanvasApi {
      * @see CanvasApi.zoomToFit()
      */
     zoomToFitRect(paperRect: Rect, options?: ViewportOptions): Promise<void>;
-    /**
-     * Returns `true` if there is an active animation for graph or links on the canvas;
-     * otherwise `false`.
-     *
-     * @see CanvasApi.animateGraph()
-     */
-    isAnimatingGraph(): boolean;
-    /**
-     * Starts animation for graph elements and links.
-     *
-     * @param setupChanges immediately called function to perform animatable changes on graph
-     * @param duration animation duration in milliseconds (requires custom CSS to override)
-     * @returns promise which resolves when this animation ends
-     *
-     * **Example**:
-     * ```js
-     * // Animate element movement by 200px (in paper coordinates) on the x-axis
-     * const target = model.getElement(...);
-     * canvas.animateGraph(() => {
-     *     const {x, y} = target.position;
-     *     target.setPosition(x + 200, y);
-     * });
-     * ```
-     */
-    animateGraph(setupChanges: () => void, duration?: number): Promise<void>;
 }
 
 /**
@@ -208,7 +178,7 @@ export interface CanvasPointerEvent {
      *
      * If `undefined` then the pointer event target is an empty canvas space.
      */
-    readonly target: HTMLElement | undefined;
+    readonly target: object | undefined;
     /**
      * `true` if event triggered while viewport is being panned (moved);
      * otherwise `false`.
@@ -277,7 +247,7 @@ export interface CanvasContextMenuEvent {
      *
      * If `undefined` then the pointer event target is an empty canvas space.
      */
-    readonly target: HTMLElement | undefined;
+    readonly target: object | undefined;
 }
 
 /**
@@ -477,27 +447,42 @@ export interface ZoomOptions {
     requireCtrl?: boolean;
 }
 
-/**
- * Canvas widget layer to render widget:
- *   - `viewport` - topmost layer, uses client (viewport) coordinates and
- *     does not scale or scroll with the diagram;
- *   - `overElements` - displayed over both elements and links, uses paper coordinates,
- *     scales and scrolls with the diagram;
- *   - `overLinks` - displayed under elements but over links, uses paper coordinates,
- *     scales and scrolls with the diagram.
- */
-export type CanvasWidgetAttachment = 'viewport' | 'overElements' | 'overLinks';
+export interface CanvasCellStrategy<Cell> {
+    getContentBounds(): Rect;
+    getCellFromElement(element: Element): Cell | undefined;
+    getCellPosition(cell: Cell): Vector;
+    setCellPosition(cell: Cell, position: Vector): void;
+    shouldMove(cell: Cell): boolean;
+    updateMove(cell: Cell, position: Vector): Cell;
+    allowScrollCell(cell: Cell): boolean;
+}
 
-/**
- * Describes canvas widget element to render on the specific widget layer.
- */
-export interface CanvasWidgetDescription {
-    /**
-     * Canvas widget element to render.
-     */
-    element: React.ReactElement;
-    /**
-     * Canvas widget layer to render widget on.
-     */
-    attachment: CanvasWidgetAttachment;
+export class EmptyCellStrategy<Cell> implements CanvasCellStrategy<Cell> {
+  getContentBounds(): Rect {
+    return {x: 0, y: 0, width: 0, height: 0};
+  }
+
+  getCellFromElement(_element: Element): Cell | undefined {
+    return undefined;
+  }
+
+  getCellPosition(_cell: Cell): Vector {
+    return {x: 0, y: 0};
+  }
+
+  setCellPosition(_cell: Cell, _position: Vector): void {
+    /* nothing */
+  }
+
+  shouldMove(_cell: Cell): boolean {
+    return false;
+  }
+
+  updateMove(cell: Cell, _position: Vector): Cell {
+    return cell;
+  }
+
+  allowScrollCell(_cell: Cell): boolean {
+    return false;
+  }
 }

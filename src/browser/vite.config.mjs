@@ -9,7 +9,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: resolve(__dirname, 'index.html'),
-        day06: resolve(__dirname, 'day06.html'),
+        day06: resolve(__dirname, 'day06/day06.html'),
       },
       output: {
         dir: resolve(__dirname, '../../dist/browser')

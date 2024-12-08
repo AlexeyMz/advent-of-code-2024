@@ -1,110 +1,80 @@
 import * as React from 'react';
-import { Component, CSSProperties } from 'react';
 
+import type { CanvasCellStrategy } from './canvasApi';
 import { Vector } from './geometry';
 
-export interface PaperProps {
-    paperTransform: PaperTransform;
-    onPointerDown?: (e: React.PointerEvent<HTMLElement>, cell: HTMLElement | undefined) => void;
-    onContextMenu?: (e: React.MouseEvent<HTMLElement>, cell: HTMLElement | undefined) => void;
-    onScrollCapture?: (e: React.UIEvent<HTMLElement>, cell: HTMLElement | undefined) => void;
-}
+export type PaperCell = { readonly paperCellBrand: void };
 
 const CLASS_NAME = 'reactodia-paper';
 
-export class Paper extends Component<PaperProps> {
-    render() {
-        const {
-            paperTransform,
-        } = this.props;
-        const {width, height, originX, originY, scale, paddingX, paddingY} = paperTransform;
+export function Paper(props: {
+    cellStrategy: CanvasCellStrategy<PaperCell>;
+    paperTransform: PaperTransform;
+    onPointerDown?: (e: React.PointerEvent<HTMLElement>, cell: PaperCell | undefined) => void;
+    onContextMenu?: (e: React.MouseEvent<HTMLElement>, cell: PaperCell | undefined) => void;
+    onScrollCapture?: (e: React.UIEvent<HTMLElement>, cell: PaperCell | undefined) => void;
+    layers: React.ReactNode;
+}) {
+    const {paperTransform, cellStrategy, onPointerDown, onContextMenu, onScrollCapture, layers} = props;
 
-        const scaledWidth = width * scale;
-        const scaledHeight = height * scale;
-        // using padding instead of margin in combination with setting width and height
-        // on .paper element to avoid "over-constrained" margins, see an explanation here:
-        // https://stackoverflow.com/questions/11695354
-        const style: CSSProperties = {
-            width: scaledWidth + paddingX,
-            height: scaledHeight + paddingY,
-            marginLeft: paddingX,
-            marginTop: paddingY,
-            paddingRight: paddingX,
-            paddingBottom: paddingY,
-        };
-        const htmlTransformStyle: React.CSSProperties = {
-            position: 'absolute', left: 0, top: 0,
-            transform: `scale(${scale},${scale})translate(${originX}px,${originY}px)`,
-        };
+    const {width, height, scale, paddingX, paddingY} = paperTransform;
 
-        return (
-            <div className={CLASS_NAME}
-                style={style}
-                onPointerDown={this.onPointerDown}
-                onContextMenu={this.onContextMenu}
-                onScrollCapture={this.onScrollCapture}>
-                <TransformedSvgCanvas
-                    className={`${CLASS_NAME}__canvas`}
-                    style={{overflow: 'visible'}}
-                    paperTransform={paperTransform}>
-
-                </TransformedSvgCanvas>
-                {linkLayerWidgets}
-                <ElementLayer model={model}
-                    renderingState={renderingState}
-                    style={htmlTransformStyle}
-                />
-                {elementLayerWidgets}
-            </div>
-        );
-    }
-
-    private onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-        const {onPointerDown} = this.props;
-        if (onPointerDown) {
-            const cell = e.target instanceof Element
-                ? findCell(e.target, e.currentTarget, model)
-                : undefined;
-            onPointerDown(e, cell);
-        }
+    const scaledWidth = width * scale;
+    const scaledHeight = height * scale;
+    // using padding instead of margin in combination with setting width and height
+    // on .paper element to avoid "over-constrained" margins, see an explanation here:
+    // https://stackoverflow.com/questions/11695354
+    const style: React.CSSProperties = {
+        width: scaledWidth + paddingX,
+        height: scaledHeight + paddingY,
+        marginLeft: paddingX,
+        marginTop: paddingY,
+        paddingRight: paddingX,
+        paddingBottom: paddingY,
     };
 
-    private onContextMenu = (e: React.MouseEvent<HTMLDivElement>) => {
-        const {onContextMenu} = this.props;
-        if (onContextMenu) {
-            const cell = e.target instanceof Element
-                ? findCell(e.target, e.currentTarget, model)
-                : undefined;
-            onContextMenu(e, cell);
-        }
-    };
 
-    private onScrollCapture = (e: React.UIEvent<HTMLElement>) => {
-        const {onScrollCapture} = this.props;
-        if (onScrollCapture) {
-            const cell = e.target instanceof Element
-                ? findCell(e.target, e.currentTarget, model)
-                : undefined;
-            onScrollCapture(e, cell);
-        }
-    };
+    const handlePointerDown = onPointerDown ? (e: React.PointerEvent<HTMLDivElement>) => {
+        const cell = e.target instanceof Element
+            ? findCell(e.target, e.currentTarget, cellStrategy)
+            : undefined;
+        onPointerDown(e, cell);
+    } : undefined;
+
+    const handleContextMenu = onContextMenu ? (e: React.MouseEvent<HTMLDivElement>) => {
+        const cell = e.target instanceof Element
+            ? findCell(e.target, e.currentTarget, cellStrategy)
+            : undefined;
+        onContextMenu(e, cell);
+    } : undefined;
+
+    const handleScrollCapture = onScrollCapture ? (e: React.UIEvent<HTMLElement>) => {
+        const cell = e.target instanceof Element
+            ? findCell(e.target, e.currentTarget, cellStrategy)
+            : undefined;
+        onScrollCapture(e, cell);
+    } : undefined;
+
+    return (
+        <div className={CLASS_NAME}
+            style={style}
+            onPointerDown={handlePointerDown}
+            onContextMenu={handleContextMenu}
+            onScrollCapture={handleScrollCapture}>
+            <PaperContext.Provider value={paperTransform}>
+                {layers}
+            </PaperContext.Provider>
+        </div>
+    );
 }
 
-function findCell(bottom: Element, top: Element, model: DiagramModel): Cell | undefined {
+function findCell(bottom: Element, top: Element, cellStrategy: CanvasCellStrategy<PaperCell>): PaperCell | undefined {
     let target: Node | null = bottom;
-    let vertexIndex: number | undefined;
     while (true) {
         if (target instanceof Element) {
-            if (target.hasAttribute('data-element-id')) {
-                return model.getElement(target.getAttribute('data-element-id')!);
-            } else if (target.hasAttribute('data-link-id')) {
-                const link = model.getLink(target.getAttribute('data-link-id')!);
-                if (!link) {
-                    return undefined;
-                }
-                return typeof vertexIndex === 'number' ? new LinkVertex(link, vertexIndex) : link;
-            } else if (target.hasAttribute('data-vertex')) {
-                vertexIndex = Number(target.getAttribute('data-vertex'));
+            const cell = cellStrategy.getCellFromElement(target);
+            if (cell) {
+                return cell;
             }
         }
         if (!target || target === top) { break; }
@@ -128,17 +98,9 @@ export interface PaperTransform {
     paddingY: number;
 }
 
-/**
- * Props for `TransformedSvgCanvas` component.
- *
- * @see TransformedSvgCanvas
- */
-export interface TransformedSvgCanvasProps extends React.HTMLProps<SVGSVGElement> {
-    paperTransform: PaperTransform;
-    svgCanvasRef?: React.RefObject<SVGSVGElement>;
-}
+const PaperContext = React.createContext<PaperTransform | null>(null);
 
-const TRANSFORMED_SVG_CANVAS_STYLE: Readonly<CSSProperties> = {
+const TRANSFORMED_SVG_CANVAS_STYLE: Readonly<React.CSSProperties> = {
     position: 'absolute',
     top: 0,
     left: 0,
@@ -149,25 +111,56 @@ const TRANSFORMED_SVG_CANVAS_STYLE: Readonly<CSSProperties> = {
  *
  * @category Components
  */
-export function TransformedSvgCanvas(props: TransformedSvgCanvasProps) {
-    const {svgCanvasRef, paperTransform, style, children, ...otherProps} = props;
-    const {width, height, originX, originY, scale, paddingX, paddingY} = paperTransform;
+export function CanvasSvgLayer(props: {
+    svgProps?: React.HTMLProps<SVGSVGElement>;
+    children: React.ReactNode;
+}) {
+    const {svgProps, children} = props;
+    const paperTransform = React.useContext(PaperContext);
+    if (!paperTransform) {
+        throw new Error('Cannot render canvas SVG layer outside a canvas');
+    }
+
+    const {width, height, originX, originY, scale} = paperTransform;
     const scaledWidth = width * scale;
     const scaledHeight = height * scale;
     let svgStyle = TRANSFORMED_SVG_CANVAS_STYLE;
-    if (style) {
-        svgStyle = {...svgStyle, ...style};
+    if (svgProps?.style) {
+        svgStyle = {...svgStyle, ...svgProps?.style};
     }
     return (
-        <svg ref={svgCanvasRef}
+        <svg {...svgProps}
             width={scaledWidth}
             height={scaledHeight}
-            style={svgStyle}
-            {...otherProps}>
+            style={svgStyle}>
+            {svgProps?.children}
             <g transform={`scale(${scale},${scale})translate(${originX},${originY})`}>
                 {children}
             </g>
         </svg>
+    );
+}
+
+export function CanvasHtmlLayer(props: {
+    htmlProps?: React.HTMLProps<HTMLDivElement>;
+    children: React.ReactNode;
+}) {
+    const {htmlProps, children} = props;
+    const paperTransform = React.useContext(PaperContext);
+    if (!paperTransform) {
+        throw new Error('Cannot render canvas HTML layer outside a canvas');
+    }
+
+    const {originX, originY, scale} = paperTransform;
+    const htmlStyle: React.CSSProperties = {
+        ...htmlProps?.style,
+        position: 'absolute', left: 0, top: 0,
+        transform: `scale(${scale},${scale})translate(${originX}px,${originY}px)`,
+    };
+    return (
+        <div {...htmlProps} style={htmlStyle}>
+            {children}
+        </div>
     );
 }
 
