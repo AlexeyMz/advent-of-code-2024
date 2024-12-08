@@ -143,6 +143,9 @@ export class CharGrid extends BaseGrid<string, CharGrid> {
     let k = 0;
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
+      if (line.length !== columns) {
+        throw new Error('Grid: inconsistent line length');
+      }
       for (let j = 0; j < line.length; j++) {
         data[k] = line.charCodeAt(j);
         k++;
