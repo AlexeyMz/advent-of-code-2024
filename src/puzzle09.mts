@@ -1,5 +1,6 @@
 import { readFile, writeFile } from 'node:fs/promises';
 
+import { DoubleLinked } from './core/linkedList.mjs';
 import { Stopwatch } from './core/performance.mjs';
 import { getDataPath } from './core/project.mjs';
 
@@ -9,7 +10,7 @@ export async function solvePuzzleBasic() {
 
   await writeFile(
     getDataPath('output/puzzle09_disk.txt'),
-    Array.from(BlockList.enumerate(disk), block =>
+    Array.from(DoubleLinked.enumerate(disk), block =>
       Array.from({length: block.size}, () => block.id ?? '.').join('')
     ).join(''),
     {encoding: 'utf8'}
@@ -34,9 +35,9 @@ export async function solvePuzzleBasic() {
     if (diff < 0) {
       start.id = end.id;
       end.size = Math.abs(diff);
-      BlockList.insertAfter(disk, end, {id: undefined, size: start.size});
+      DoubleLinked.insertAfter(disk, end, {id: undefined, size: start.size});
     } else if (diff > 0) {
-      BlockList.insertAfter(disk, start, {id: undefined, size: diff});
+      DoubleLinked.insertAfter(disk, start, {id: undefined, size: diff});
       start.id = end.id;
       start.size = end.size;
       end.id = undefined;
@@ -48,7 +49,7 @@ export async function solvePuzzleBasic() {
 
   await writeFile(
     getDataPath('output/puzzle09_defragmented1.txt'),
-    Array.from(BlockList.enumerate(disk), block =>
+    Array.from(DoubleLinked.enumerate(disk), block =>
       Array.from({length: block.size}, () => block.id ?? '.').join('')
     ).join(''),
     {encoding: 'utf8'}
@@ -62,7 +63,7 @@ export async function solvePuzzleAdvanced() {
   const disk = parseBlockList(content.trim());
 
   const freeBlocks: Block[] = [];
-  for (const block of BlockList.enumerate(disk)) {
+  for (const block of DoubleLinked.enumerate(disk)) {
     if (block.id === undefined) {
       freeBlocks.push(block);
     }
@@ -91,7 +92,7 @@ export async function solvePuzzleAdvanced() {
         id: undefined,
         size: free.block.size - block.size,
       };
-      BlockList.insertAfter(disk, free.block, leftFree);
+      DoubleLinked.insertAfter(disk, free.block, leftFree);
       free.block.id = block.id;
       free.block.size = block.size;
       free.block = leftFree;
@@ -103,7 +104,7 @@ export async function solvePuzzleAdvanced() {
 
   await writeFile(
     getDataPath('output/puzzle09_defragmented2.txt'),
-    Array.from(BlockList.enumerate(disk), block =>
+    Array.from(DoubleLinked.enumerate(disk), block =>
       Array.from({length: block.size}, () => block.id ?? '.').join('')
     ).join(''),
     {encoding: 'utf8'}
@@ -112,94 +113,16 @@ export async function solvePuzzleAdvanced() {
   console.log(`Puzzle 09 (advanced): ${checksumBlockList(disk)}`);
 }
 
-interface Block {
+interface Block extends DoubleLinked.Node<Block> {
   id: number | undefined;
   size: number;
-
-  next?: Block;
-  previous?: Block;
 }
 
-interface BlockList {
-  first: Block | undefined;
-  last: Block | undefined;
-}
-
-namespace BlockList {
-  export function insertFirst(list: BlockList, block: Block): void {
-    if (list.first) {
-      const start = list.first;
-      block.next = start;
-      block.previous = undefined;
-      start.previous = block;
-      list.first = block;
-    } else {
-      list.first = block;
-      list.last = block;
-    }
-  }
-
-  export function insertLast(list: BlockList, block: Block): void {
-    if (list.last) {
-      const end = list.last;
-      block.previous = end;
-      block.next = undefined;
-      end.next = block;
-      list.last = block;
-    } else {
-      list.first = block;
-      list.last = block;
-    }
-  }
-
-  export function remove(list: BlockList, block: Block): void {
-    let {previous, next} = block;
-
-    if (previous) {
-      previous.next = next;
-    } else {
-      list.first = next;
-    }
-
-    if (next) {
-      next.previous = previous;
-    } else {
-      list.last = previous;
-    }
-
-    block.previous = undefined;
-    block.next = undefined;
-  }
-
-  export function insertAfter(list: BlockList, target: Block | undefined, block: Block) {
-    if (target) {
-      const follower = target.next;
-      target.next = block;
-      block.previous = target;
-      block.next = follower;
-      if (follower) {
-        follower.previous = block;
-      } else {
-        list.last = block;
-      }
-    } else {
-      insertFirst(list, block);
-    }
-  }
-
-  export function* enumerate(list: BlockList): Iterable<Block> {
-    let block = list.first;
-    while (block) {
-      yield block;
-      block = block.next;
-    }
-  }
-}
+type BlockList = DoubleLinked.List<Block>;
 
 function parseBlockList(line: string): BlockList {
   const list: BlockList = {
-    first: undefined,
-    last: undefined,
+    ...DoubleLinked.empty(),
   };
   let nextIndex = 0;
   let nextFree = false;
@@ -212,7 +135,7 @@ function parseBlockList(line: string): BlockList {
         previous: undefined,
         next: undefined,
       };
-      BlockList.insertLast(list, block);
+      DoubleLinked.insertLast(list, block);
     }
     nextIndex += nextFree ? 0 : 1;
     nextFree = !nextFree;
@@ -223,7 +146,7 @@ function parseBlockList(line: string): BlockList {
 function checksumBlockList(list: BlockList): number {
   let index = 0;
   let total = 0;
-  for (const block of BlockList.enumerate(list)) {
+  for (const block of DoubleLinked.enumerate(list)) {
     for (let i = 0; i < block.size; i++) {
       if (block.id !== undefined) {
         total += index * block.id;
