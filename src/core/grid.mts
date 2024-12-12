@@ -59,6 +59,15 @@ abstract class BaseGrid<T, Self extends BaseGrid<T, Self>> {
     this.data.fill(this.wrap(value));
   }
 
+  fillFrom<U>(
+    other: BaseGrid<U, any>,
+    mapper: (value: U) => T
+  ): void {
+    for (let i = 0; i < this.data.length; i++) {
+      this.data[i] = this.wrap(mapper(other.unwrap(other.data[i])));
+    }
+  }
+
   count(filter: (value: T) => boolean): number {
     let count = 0;
     for (const item of this.data) {
@@ -67,14 +76,6 @@ abstract class BaseGrid<T, Self extends BaseGrid<T, Self>> {
       }
     }
     return count;
-  }
-
-  map(mapper: (value: T) => T): Self {
-    const data = new Uint16Array(this.data.length);
-    for (let i = 0; i < data.length; i++) {
-      data[i] = this.wrap(mapper(this.unwrap(this.data[i])));
-    }
-    return this.create(this.rows, this.columns, data);
   }
 
   joinFrom(other: Self, joiner: (a: T, b: T) => T): void {
@@ -106,12 +107,18 @@ abstract class BaseGrid<T, Self extends BaseGrid<T, Self>> {
 }
 
 export class NumericGrid extends BaseGrid<number, NumericGrid> {
-  static empty(rows: number, columns: number, value: number): NumericGrid {
+  static empty(rows: number, columns: number, value?: number): NumericGrid {
     const data = new Uint16Array(rows * columns);
     if (value) {
       data.fill(value);
     }
     return new NumericGrid(rows, columns, data);
+  }
+
+  static from<T>(other: BaseGrid<T, any>, mapper: (value: T) => number): NumericGrid {
+    const grid = NumericGrid.empty(other.rows, other.columns);
+    grid.fillFrom(other, mapper);
+    return grid;
   }
 
   override create(rows: number, columns: number, data: Uint16Array): NumericGrid {
@@ -130,10 +137,14 @@ export class NumericGrid extends BaseGrid<number, NumericGrid> {
 export class CharGrid extends BaseGrid<string, CharGrid> {
   static empty(rows: number, columns: number, value: string): CharGrid {
     const data = new Uint16Array(rows * columns);
-    if (value) {
-      data.fill(value.charCodeAt(0));
-    }
+    data.fill(value.charCodeAt(0));
     return new CharGrid(rows, columns, data);
+  }
+
+  static from<T>(other: BaseGrid<T, any>, mapper: (value: T) => string): CharGrid {
+    const grid = CharGrid.empty(other.rows, other.columns, '\0');
+    grid.fillFrom(other, mapper);
+    return grid;
   }
 
   static fromLines(lines: readonly string[]): CharGrid {
