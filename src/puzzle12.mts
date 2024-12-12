@@ -174,10 +174,10 @@ function shiftToSide(shiftRow: number, shiftColumn: number): SideFlag {
   );
 }
 
-const SIDE_TO_CHAR = '.^>└v|┌├<┘-┴┐┤┬┼OÄ»╚Ü║╔╠«╝═╩╗╣╦╬Ø';
+const SIDE_TO_CHAR = '◻◚◨◣◛▤◤◗◧◢▥◠◥◖◡▣';
 
 function sideFlagToChar(flags: number): string {
-  return SIDE_TO_CHAR[flags] ?? '?';
+  return SIDE_TO_CHAR[flags & ~SideFlag.Leader] ?? '?';
 }
 
 (async function main() {
