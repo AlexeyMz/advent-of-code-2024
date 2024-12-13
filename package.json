@@ -23,5 +23,8 @@
     "@types/node": "^22.10.1",
     "ts-node": "^10.9.2",
     "typescript": "^5.7.2"
+  },
+  "dependencies": {
+    "z3-solver": "^4.13.3"
   }
 }
