@@ -1,0 +1,8 @@
+[package]
+name = "alexeymz-advent-of-code-2024"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+z3 = "0.12.1"
+z3-sys = { version = "0.8.1", features = ["static-link-z3"] }
