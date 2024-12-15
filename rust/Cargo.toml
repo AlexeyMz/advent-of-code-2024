@@ -7,6 +7,14 @@ edition = "2021"
 z3 = "0.12.1"
 z3-sys = "0.8.1"
 
+[lib]
+name = "core"
+path = "src/core/lib.rs"
+
 [[bin]]
 name = "puzzle13"
 path = "src/puzzle13/main.rs"
+
+[[bin]]
+name = "puzzle15"
+path = "src/puzzle15/main.rs"
