@@ -15,6 +15,7 @@ dependencies = [
 name = "alexeymz-advent-of-code-2024"
 version = "0.1.0"
 dependencies = [
+ "regex",
  "z3",
  "z3-sys",
 ]
