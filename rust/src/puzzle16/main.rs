@@ -112,13 +112,6 @@ fn advanced() {
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
 enum Direction { North, East, South, West }
 
-// const ALL_DIRECTIONS: &'static [Direction] = &[
-//     Direction::North,
-//     Direction::East,
-//     Direction::South,
-//     Direction::West,
-// ];
-
 impl Direction {
     fn turn_right(&self) -> Direction {
         match self {
