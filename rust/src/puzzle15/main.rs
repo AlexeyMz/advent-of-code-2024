@@ -13,7 +13,6 @@ fn basic() {
     let input = read_to_string(get_data_path("input/puzzle15.txt")).unwrap();
     let (mut grid, steps) = parse_input(&input);
 
-
     let mut position = grid.find(&'@').unwrap();
     for step in steps.chars() {
         let direction = direction_from_step(step);

@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+fplist = "0.2.1"
+priority-queue = "2.1.1"
 regex = "1.11.1"
 z3 = "0.12.1"
 z3-sys = "0.8.1"
@@ -19,3 +21,7 @@ path = "src/puzzle13/main.rs"
 [[bin]]
 name = "puzzle15"
 path = "src/puzzle15/main.rs"
+
+[[bin]]
+name = "puzzle16"
+path = "src/puzzle16/main.rs"
