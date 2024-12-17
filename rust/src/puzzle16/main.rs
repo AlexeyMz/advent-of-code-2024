@@ -1,16 +1,15 @@
 use core::{get_data_path, AStar, AStarGraph, AStarNode, Grid};
-use fplist::{PersistentList, cons};
 use std::{fmt::Debug, fs::{read_to_string, File}, io::{LineWriter, Write}};
 
 fn main() {
     use std::time::Instant;
     let before = Instant::now();
-    // basic();
+    basic();
     advanced();
     println!("Elapsed time: {:.2?}", before.elapsed());
 }
 
-fn _basic() {
+fn basic() {
     let input = read_to_string(get_data_path("input/puzzle16.txt")).unwrap();
     let maze = Grid::from_lines(
         &input.lines()
@@ -30,10 +29,14 @@ fn _basic() {
     match astar.found_goal() {
         Some((final_node, final_cost)) => {
             let mut path = maze.clone();
-            let mut current = final_node.path.clone();
-            while let Some(((x, y, dir), next)) = current.pop() {
-                path.set((x, y), dir.to_char());
-                current = next;
+            let mut current = Some(final_node.key());
+            while let Some(to) = current {
+                path.set((to.0, to.1), to.2.to_char());
+                current = None;
+                for from in astar.get_from(&to) {
+                    current = Some(*from);
+                    break;
+                }
             }
 
             let mut path_writer = LineWriter::new(
@@ -154,7 +157,6 @@ struct MazeNode {
     x: i32,
     y: i32,
     direction: Direction,
-    path: PersistentList<(i32, i32, Direction)>,
 }
 
 impl Debug for MazeNode {
@@ -191,8 +193,7 @@ impl<'a> AStarGraph<MazeNode> for MazeGraph<'a> {
 
     fn start(&self) -> MazeNode {
         let (x, y) = self.start;
-        let path = PersistentList::new();
-        MazeNode { x, y, direction: Direction::East, path }
+        MazeNode { x, y, direction: Direction::East }
     }
 
     fn neighbors(&self, node: &MazeNode) -> impl Iterator<Item = (MazeNode, Self::Cost)> + '_ {
@@ -202,7 +203,6 @@ impl<'a> AStarGraph<MazeNode> for MazeGraph<'a> {
             from_y: node.y,
             direction: node.direction,
             index: 0,
-            path: node.path.clone(),
         }
     }
 
@@ -245,7 +245,6 @@ struct MazeNeighbors<'a> {
     from_y: i32,
     direction: Direction,
     index: usize,
-    path: PersistentList<(i32, i32, Direction)>,
 }
 
 impl<'a> Iterator for MazeNeighbors<'a> {
@@ -263,7 +262,6 @@ impl<'a> Iterator for MazeNeighbors<'a> {
                             x: next.0,
                             y: next.1,
                             direction: self.direction,
-                            path: cons((self.from_x, self.from_y, self.direction), self.path.clone())
                         };
                         return Some((node, 1));
                     }
@@ -279,7 +277,6 @@ impl<'a> Iterator for MazeNeighbors<'a> {
                         x: self.from_x,
                         y: self.from_y,
                         direction,
-                        path: cons((self.from_x, self.from_y, self.direction), self.path.clone())
                     };
                     return Some((node, 1000));
                 }
