@@ -5,11 +5,12 @@ use std::{fmt::Debug, fs::{read_to_string, File}, io::{LineWriter, Write}};
 fn main() {
     use std::time::Instant;
     let before = Instant::now();
-    basic();
+    // basic();
+    advanced();
     println!("Elapsed time: {:.2?}", before.elapsed());
 }
 
-fn basic() {
+fn _basic() {
     let input = read_to_string(get_data_path("input/puzzle16.txt")).unwrap();
     let maze = Grid::from_lines(
         &input.lines()
@@ -49,6 +50,60 @@ fn basic() {
             println!("Failed to find path through maze (basic).");
         }
     }
+}
+
+fn advanced() {
+    let input = read_to_string(get_data_path("input/puzzle16.txt")).unwrap();
+    let mut maze = Grid::from_lines(
+        &input.lines()
+            .filter(|line| !line.is_empty())
+            .map(|line| line.into())
+            .collect::<Vec<String>>()
+    );
+
+    let goal = maze.find(&'E').unwrap();
+    maze.set(goal, '.');
+
+    let graph = MazeGraph::new(&maze);
+    let mut astar = AStar::new(graph);
+    loop {
+        if astar.next() {
+            break;
+        }
+    }
+
+    let mut best_paths = maze.clone();
+    let mut to_visit = vec![
+        (goal.0, goal.1, Direction::North),
+        (goal.0, goal.1, Direction::South),
+        (goal.0, goal.1, Direction::East),
+        (goal.0, goal.1, Direction::West),
+    ];
+    while let Some(to_key) = to_visit.pop() {
+        best_paths.set((to_key.0, to_key.1), 'O');
+        for origin in astar.get_from(&to_key) {
+            to_visit.push(origin.clone());
+        }
+    }
+
+    let mut path_writer = LineWriter::new(
+        File::create(get_data_path("output/puzzle16_best_all.txt")).unwrap()
+    );
+    for line in best_paths.lines() {
+        path_writer.write_all(line.as_bytes()).unwrap();
+    }
+    path_writer.write_all(b"\n").unwrap();
+
+    let mut tile_count = 0;
+    for i in 0..best_paths.width() {
+        for j in 0..best_paths.height() {
+            if let Some('O') = best_paths.get((i, j)) {
+                tile_count += 1;
+            }
+        }
+    }
+
+    println!("Best paths tile count (advanced): {tile_count}");
 }
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
@@ -111,7 +166,7 @@ impl Debug for MazeNode {
 struct MazeGraph<'a> {
     maze: &'a Grid<char>,
     start: (i32, i32),
-    end: (i32, i32),
+    end: Option<(i32, i32)>,
     debug: bool,
 }
 
@@ -126,7 +181,7 @@ impl AStarNode for MazeNode {
 impl<'a> MazeGraph<'a> {
     fn new(maze: &Grid<char>) -> MazeGraph {
         let start = maze.find(&'S').unwrap();
-        let end = maze.find(&'E').unwrap();
+        let end = maze.find(&'E');
         MazeGraph { maze, start, end, debug: false }
     }
 }
@@ -152,17 +207,23 @@ impl<'a> AStarGraph<MazeNode> for MazeGraph<'a> {
     }
 
     fn estimate(&self, node: &MazeNode) -> Self::Cost {
-        let dx = self.end.0 - node.x;
-        let dy = self.end.1 - node.y;
-        let mut cost = dx.abs() + dy.abs();
-        if dx != 0 || dy != 0 {
-            cost += 1000;
+        if let Some((end_x, end_y)) = self.end {
+            let dx = end_x - node.x;
+            let dy = end_y - node.y;
+            let mut cost = dx.abs() + dy.abs();
+            if dx != 0 || dy != 0 {
+                cost += 1000;
+            }
+            return cost;
         }
-        return cost;
+        return 0;
     }
 
     fn is_goal(&self, node: &MazeNode) -> bool {
-        return node.x == self.end.0 && node.y == self.end.1;
+        if let Some((end_x, end_y)) = self.end {
+            return node.x == end_x && node.y == end_y;
+        }
+        return false;
     }
 
     fn on_visit_node(&self, node: &MazeNode, path_cost: Self::Cost) {
