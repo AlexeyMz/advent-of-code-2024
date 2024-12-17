@@ -1,5 +1,5 @@
 use core::{get_data_path, AStar, AStarGraph, AStarNode, Grid};
-use fplist::{PersistentList, cons, };
+use fplist::{PersistentList, cons};
 use std::{fmt::Debug, fs::{read_to_string, File}, io::{LineWriter, Write}};
 
 fn main() {
@@ -10,7 +10,7 @@ fn main() {
 }
 
 fn basic() {
-    let input = read_to_string(get_data_path("input/puzzle16_test.txt")).unwrap();
+    let input = read_to_string(get_data_path("input/puzzle16.txt")).unwrap();
     let maze = Grid::from_lines(
         &input.lines()
             .filter(|line| !line.is_empty())
@@ -26,23 +26,29 @@ fn basic() {
         }
     }
 
-    let mut path = maze.clone();
-    let (final_node, final_cost) = astar.found_goal().clone().unwrap();
-    let mut current = final_node.path;
-    while let Some(((x, y, dir), next)) = current.pop() {
-        path.set(y, x, dir.to_char());
-        current = next;
-    }
+    match astar.found_goal() {
+        Some((final_node, final_cost)) => {
+            let mut path = maze.clone();
+            let mut current = final_node.path.clone();
+            while let Some(((x, y, dir), next)) = current.pop() {
+                path.set((x, y), dir.to_char());
+                current = next;
+            }
 
-    let mut path_writer = LineWriter::new(
-        File::create(get_data_path("output/puzzle16_path.txt")).unwrap()
-    );
-    for line in path.lines() {
-        path_writer.write_all(line.as_bytes()).unwrap();
-    }
-    path_writer.write_all(b"\n").unwrap();
+            let mut path_writer = LineWriter::new(
+                File::create(get_data_path("output/puzzle16_path.txt")).unwrap()
+            );
+            for line in path.lines() {
+                path_writer.write_all(line.as_bytes()).unwrap();
+            }
+            path_writer.write_all(b"\n").unwrap();
 
-    println!("Path cost (basic): {final_cost}");
+            println!("Path cost (basic): {final_cost}");
+        }
+        None => {
+            println!("Failed to find path through maze (basic).");
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
@@ -72,9 +78,9 @@ impl Direction {
     fn offset(&self) -> (i32, i32) {
         match self {
             Direction::North => (0, -1),
-            Direction::East => (-1, 0),
             Direction::South => (0, 1),
-            Direction::West => (1, 0),
+            Direction::West => (-1, 0),
+            Direction::East => (1, 0),
         }
     }
 
@@ -106,6 +112,7 @@ struct MazeGraph<'a> {
     maze: &'a Grid<char>,
     start: (i32, i32),
     end: (i32, i32),
+    debug: bool,
 }
 
 impl AStarNode for MazeNode {
@@ -120,7 +127,7 @@ impl<'a> MazeGraph<'a> {
     fn new(maze: &Grid<char>) -> MazeGraph {
         let start = maze.find(&'S').unwrap();
         let end = maze.find(&'E').unwrap();
-        MazeGraph { maze, start, end }
+        MazeGraph { maze, start, end, debug: false }
     }
 }
 
@@ -157,6 +164,18 @@ impl<'a> AStarGraph<MazeNode> for MazeGraph<'a> {
     fn is_goal(&self, node: &MazeNode) -> bool {
         return node.x == self.end.0 && node.y == self.end.1;
     }
+
+    fn on_visit_node(&self, node: &MazeNode, path_cost: Self::Cost) {
+        if self.debug {
+            println!("Node {:?} (path: {})", node, path_cost);
+        }
+    }
+
+    fn on_push_edge(&self, _from: &MazeNode, to: &MazeNode, cost: Self::Cost) {
+        if self.debug {
+            println!("    -> {:?} (cost {})", to, cost);
+        }
+    }
 }
 
 struct MazeNeighbors<'a> {
@@ -178,7 +197,7 @@ impl<'a> Iterator for MazeNeighbors<'a> {
                     self.index += 1;
                     let (dx, dy) = self.direction.offset();
                     let next = (self.from_x + dx, self.from_y + dy);
-                    if let Some('.') = self.maze.get(next.1, next.0) {
+                    if let Some('.' | 'S' | 'E') = self.maze.get(next) {
                         let node = MazeNode {
                             x: next.0,
                             y: next.1,

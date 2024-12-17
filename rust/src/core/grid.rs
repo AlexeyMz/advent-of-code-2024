@@ -1,60 +1,60 @@
 pub struct Grid<T> {
     data: Vec<T>,
-    rows: i32,
-    columns: i32,
+    width: i32,
+    height: i32,
 }
 
 impl<T> Grid<T> {
-    pub fn rows(&self) -> i32 {
-        self.rows
+    pub fn width(&self) -> i32 {
+        self.width
     }
 
-    pub fn columns(&self) -> i32 {
-        self.columns
+    pub fn height(&self) -> i32 {
+        self.height
     }
 }
 
 impl<T: Clone> Grid<T> {
-    pub fn new(rows: i32, columns: i32, filler: T) -> Grid<T> {
-        let size: usize = (rows * columns).try_into().unwrap();
+    pub fn new(width: i32, height: i32, filler: T) -> Grid<T> {
+        let size: usize = (width * height).try_into().unwrap();
         Grid {
             data: vec![filler; size],
-            rows,
-            columns,
+            width,
+            height,
         }
     }
 
     pub fn map<U: Clone>(&self, mapper: impl FnMut(&T) -> U) -> Grid<U> {
         Grid {
             data: self.data.iter().map(mapper).collect(),
-            rows: self.rows,
-            columns: self.columns,
+            width: self.width,
+            height: self.height,
         }
     }
 
-    pub fn valid(&self, row: i32, column: i32) -> bool {
-        row >= 0 && row < self.rows &&
-        column >= 0 && column <= self.columns
+    pub fn valid(&self, (x, y): (i32, i32)) -> bool {
+        x >= 0 && x < self.width &&
+        y >= 0 && y <= self.height
     }
 
-    pub fn get(&self, row: i32, column: i32) -> Option<T> {
-        if self.valid(row, column) {
-            let index: usize = (row * self.columns + column).try_into().unwrap();
+    pub fn get(&self, at: (i32, i32)) -> Option<T> {
+        if self.valid(at) {
+            let index: usize = (at.1 * self.width + at.0).try_into().unwrap();
             Some(self.data[index].clone())
         } else {
             None
         }
     }
 
-    pub fn set(&mut self, row: i32, column: i32, value: T) {
-        if !self.try_set(row, column, value) {
+    pub fn set(&mut self, at: (i32, i32), value: T) {
+        if !self.try_set(at, value) {
             panic!("Grid: trying to set out of bounds")
         }
     }
 
-    pub fn try_set(&mut self, row: i32, column: i32, value: T) -> bool {
-        if self.valid(row, column) {
-            let index: usize = (row * self.columns + column).try_into().unwrap();
+    pub fn try_set(&mut self, at: (i32, i32), value: T) -> bool {
+        if self.valid(at) {
+            let index: usize = (at.1 * self.width + at.0).try_into().unwrap();
             self.data[index] = value;
             return true;
         } else {
@@ -79,18 +79,19 @@ impl<T: Clone> Clone for Grid<T> {
     fn clone(&self) -> Grid<T> {
         Grid {
             data: self.data.clone(),
-            rows: self.rows,
-            columns: self.columns,
+            width: self.width,
+            height: self.height,
         }
     }
 }
 
 impl<T: Clone + PartialEq> Grid<T> {
     pub fn find(&self, value: &T) -> Option<(i32, i32)> {
-        for i in 0..self.rows {
-            for j in 0..self.columns {
-                if self.get(i, j).unwrap() == *value {
-                    return Some((i, j));
+        for i in 0..self.width {
+            for j in 0..self.height {
+                let at = (i, j);
+                if self.get(at).unwrap() == *value {
+                    return Some(at);
                 }
             }
         }
@@ -100,12 +101,12 @@ impl<T: Clone + PartialEq> Grid<T> {
 
 impl Grid<char> {
     pub fn from_lines(lines: &[String]) -> Grid<char> {
-        let rows = lines.len();
-        let columns = if lines.is_empty() { 0 } else { lines[0].len() };
-        let mut data = vec!['\0'; rows * columns];
+        let height = lines.len();
+        let width = if lines.is_empty() { 0 } else { lines[0].len() };
+        let mut data = vec!['\0'; width * height];
         let mut offset: usize = 0;
         for line in lines {
-            if line.len() != columns {
+            if line.len() != width {
                 panic!("Grid: inconsistent line length");
             }
             for ch in line.chars() {
@@ -115,13 +116,13 @@ impl Grid<char> {
         }
         return Grid {
             data,
-            rows: rows.try_into().unwrap(),
-            columns: columns.try_into().unwrap(),
+            width: width.try_into().unwrap(),
+            height: height.try_into().unwrap(),
         };
     }
 
     pub fn lines<'a>(&'a self) -> impl Iterator<Item = String> + 'a {
-        let chunk_size = self.columns.try_into().unwrap();
+        let chunk_size = self.width.try_into().unwrap();
         self.data.chunks(chunk_size)
             .map(|line| line.into_iter().collect::<String>() + "\n")
     }
