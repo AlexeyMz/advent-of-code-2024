@@ -17,7 +17,7 @@ pub trait AStarGraph<N: AStarNode> {
     fn is_goal(&self, node: &N) -> bool;
 
     fn on_visit_node(&self, _node: &N, _path_cost: Self::Cost) {}
-    fn on_push_edge(&self, _from: &N, _to: &N, _cost: Self::Cost) {}
+    fn on_visit_edge(&self, _from: &N, _to: &N, _cost: Self::Cost) {}
 }
 
 pub struct AStar<N: AStarNode, G: AStarGraph<N>> {
@@ -107,19 +107,21 @@ impl<N: AStarNode, G: AStarGraph<N>> AStar<N, G> {
                 let neighbor_key = neighbor.key();
                 if let Some(existing) = self.paths.get_mut(&neighbor_key) {
                     if neighbor_cost < existing.cost {
-                        self.graph.on_push_edge(&path_to, &neighbor, edge_cost);
-                        self.queue.change_priority(&neighbor_key, PathCost(estimated_cost));
+                        self.graph.on_visit_edge(&path_to, &neighbor, edge_cost);
+                        if self.queue.get_priority(&neighbor_key).is_some() {
+                            self.queue.change_priority(&neighbor_key, PathCost(estimated_cost));
+                        }
                         self.paths.insert(neighbor_key.clone(), AStarPath {
                             to: neighbor,
                             from: vec![key.clone()],
                             cost: neighbor_cost,
                         });
                     } else if neighbor_cost == existing.cost {
-                        self.graph.on_push_edge(&path_to, &neighbor, edge_cost);
+                        self.graph.on_visit_edge(&path_to, &neighbor, edge_cost);
                         existing.from.push(key.clone());
                     }
                 } else {
-                    self.graph.on_push_edge(&path_to, &neighbor, edge_cost);
+                    self.graph.on_visit_edge(&path_to, &neighbor, edge_cost);
                     self.queue.push(neighbor_key.clone(), PathCost(estimated_cost));
                     self.paths.insert(neighbor_key.clone(), AStarPath {
                         to: neighbor,

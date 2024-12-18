@@ -225,7 +225,7 @@ impl<'a> AStarGraph<MazeNode> for MazeGraph<'a> {
         }
     }
 
-    fn on_push_edge(&self, _from: &MazeNode, to: &MazeNode, cost: Self::Cost) {
+    fn on_visit_edge(&self, _from: &MazeNode, to: &MazeNode, cost: Self::Cost) {
         if self.debug {
             println!("    -> {:?} (cost {})", to, cost);
         }
