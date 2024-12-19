@@ -76,6 +76,10 @@ impl<N: AStarNode, G: AStarGraph<N>> AStar<N, G> {
             .flat_map(|path| path.from.iter())
     }
 
+    pub fn get_cost(&self, to: &N::Key) -> Option<G::Cost> {
+        self.paths.get(to).map(|path| path.cost)
+    }
+
     pub fn found_goal(&self) -> &Option<(N, G::Cost)> {
         &self.found_goal
     }

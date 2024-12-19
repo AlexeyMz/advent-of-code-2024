@@ -82,6 +82,12 @@ fn advanced() {
         (goal.0, goal.1, Direction::East),
         (goal.0, goal.1, Direction::West),
     ];
+
+    let min_cost = to_visit.iter().map(|key| astar.get_cost(key)).min();
+    if let Some(min_cost) = min_cost {
+        to_visit.retain(|key| astar.get_cost(key) == min_cost);
+    }
+
     while let Some(to_key) = to_visit.pop() {
         best_paths.set((to_key.0, to_key.1), 'O');
         for origin in astar.get_from(&to_key) {
