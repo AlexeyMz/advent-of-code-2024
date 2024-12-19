@@ -1,7 +1,7 @@
 use core::get_data_path;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use regex::Regex;
-use std::env;
+use std::{env, iter};
 use std::error::Error;
 use std::fs::{File, read_to_string};
 use std::io::{stdout, LineWriter, Write};
@@ -25,12 +25,13 @@ fn main() {
     } else {
         use std::time::Instant;
         let before = Instant::now();
-        basic();
+        // basic();
+        advanced();
         println!("Elapsed time: {:.2?}", before.elapsed());
     }
 }
 
-fn basic() {
+fn _basic() {
     let input = read_to_string(get_data_path("input/puzzle17.txt")).unwrap();
     let description = ComputerDescription::parse(&input).unwrap();
 
@@ -43,10 +44,54 @@ fn basic() {
 
     let mut state = ComputerState::new();
     let mut output = Vec::new();
+    description.initialize(&mut state);
     description.run(&mut state, |n| output.push(n)).unwrap();
 
     let joined_output = output.iter().map(|n| n.to_string()).collect::<Vec<String>>().join(",");
     println!("Program output (basic): {}", joined_output);
+}
+
+fn advanced() {
+    let input = read_to_string(get_data_path("input/puzzle17_test.txt")).unwrap();
+    let description = ComputerDescription::parse(&input).unwrap();
+
+    let mut linear_program = description.program.clone();
+    linear_program.splice((description.program.len() - 2).., iter::empty());
+    let linear = ComputerDescription {
+        program: linear_program,
+        ..description
+    };
+
+    let mut out_to_a: HashMap<u8, HashSet<u64>> = HashMap::new();
+    for a_bits in 0..1024 {
+        let mut state = ComputerState {
+            register_a: a_bits,
+            register_b: 0,
+            register_c: 0,
+            instruction: 0,
+        };
+        let mut out: u8 = 0;
+        linear.run(&mut state, |n| out = n.try_into().unwrap()).unwrap();
+        if let Some(a_variants) = out_to_a.get_mut(&out) {
+            a_variants.insert(a_bits);
+        } else {
+            out_to_a.insert(out, [a_bits].into());
+        }
+    }
+
+    let mut step_variants: Vec<Vec<u64>> = Vec::new();
+    for (i, byte) in description.program.iter().enumerate() {
+        step_variants.push(out_to_a.get(byte).unwrap());
+        for j in 0..4 {
+
+        }
+    }
+
+    // for (out, a_variants) in out_to_a.iter() {
+    //     println!("out={out} when a={a_variants:?}");
+    // }
+
+    println!("Register A for quine (advanced): {}", 0);
 }
 
 fn disassemble<W: Write>(writer: &mut W, program: &Vec<u8>) -> Result<(), Box<dyn Error>> {
@@ -121,12 +166,14 @@ impl ComputerDescription {
         return decoded;
     }
 
-    fn run(&self, state: &mut ComputerState, mut handle_output: impl FnMut(u64) -> ()) -> Result<(), String> {
+    fn initialize(&self, state: &mut ComputerState) {
         state.register_a = self.register_a;
         state.register_b = self.register_b;
         state.register_c = self.register_c;
         state.instruction = 0;
+    }
 
+    fn run(&self, state: &mut ComputerState, mut handle_output: impl FnMut(u64) -> ()) -> Result<(), String> {
         while state.instruction < self.program.len() {
             let index: usize = state.instruction;
             let raw_code = self.program[index];
@@ -135,17 +182,19 @@ impl ComputerDescription {
                 .ok_or(format!("Invalid instruction #{index}: {raw_code},{raw_operand}"))?;
             match opcode {
                 Opcode::Adv => {
-                    state.register_a >>= state.read(&operand);
+                    state.register_a >>= state.read(&operand)?;
                 }
                 Opcode::Bxl => {
-                    state.register_b ^= state.read(&operand);
+                    state.register_b ^= state.read(&operand)?;
                 }
                 Opcode::Bst => {
-                    state.register_b = state.read(&operand) % 8;
+                    state.register_b = state.read(&operand)? % 8;
                 }
                 Opcode::Jnz => {
                     if state.register_a != 0 {
-                        state.instruction = state.read(&operand).try_into().unwrap();
+                        state.instruction = state.read(&operand)?
+                            .try_into()
+                            .map_err(|_| "Cannot convert value to pointer")?;
                         continue;
                     }
                 }
@@ -153,13 +202,13 @@ impl ComputerDescription {
                     state.register_b ^= state.register_c;
                 }
                 Opcode::Out => {
-                    handle_output(state.read(&operand) % 8);
+                    handle_output(state.read(&operand)? % 8);
                 }
                 Opcode::Bdv => {
-                    state.register_b = state.register_a >> state.read(&operand);
+                    state.register_b = state.register_a >> state.read(&operand)?;
                 }
                 Opcode::Cdv => {
-                    state.register_c = state.register_a >> state.read(&operand);
+                    state.register_c = state.register_a >> state.read(&operand)?;
                 }
             }
             state.instruction += 2;
@@ -185,13 +234,13 @@ impl ComputerState {
         }
     }
 
-    fn read(&self, operand: &Operand) -> u64 {
+    fn read(&self, operand: &Operand) -> Result<u64, String> {
         match operand {
-            Operand::Literal(value) => (*value).into(),
-            Operand::Register(Register::A) => self.register_a,
-            Operand::Register(Register::B) => self.register_b,
-            Operand::Register(Register::C) => self.register_c,
-            Operand::Unused(value) => panic!("Cannot read unsed operand with value {value}")
+            Operand::Literal(value) => Ok((*value).into()),
+            Operand::Register(Register::A) => Ok(self.register_a),
+            Operand::Register(Register::B) => Ok(self.register_b),
+            Operand::Register(Register::C) => Ok(self.register_c),
+            Operand::Unused(value) => Err(format!("Cannot read unsed operand with value {value}"))
         }
     }
 }
@@ -266,7 +315,7 @@ impl std::fmt::Display for Instruction {
                 write!(f, "bxc B ^ C -> B : {}", self.1)
             }
             Opcode::Out => {
-                write!(f, "out {}", self.1)
+                write!(f, "out {} % 8", self.1)
             }
             Opcode::Bdv => {
                 write!(f, "bdv A >> {} -> B", self.1)
