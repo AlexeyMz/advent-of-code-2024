@@ -34,7 +34,7 @@ impl<T: Clone> Grid<T> {
 
     pub fn valid(&self, (x, y): (i32, i32)) -> bool {
         x >= 0 && x < self.width &&
-        y >= 0 && y <= self.height
+        y >= 0 && y < self.height
     }
 
     pub fn get(&self, at: (i32, i32)) -> Option<T> {
