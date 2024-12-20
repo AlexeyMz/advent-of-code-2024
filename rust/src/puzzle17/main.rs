@@ -1,7 +1,8 @@
 use core::get_data_path;
-use std::collections::{HashMap, HashSet};
+use fplist::{PersistentList, cons};
 use regex::Regex;
 use std::{env, iter};
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fs::{File, read_to_string};
 use std::io::{stdout, LineWriter, Write};
@@ -25,13 +26,13 @@ fn main() {
     } else {
         use std::time::Instant;
         let before = Instant::now();
-        // basic();
+        basic();
         advanced();
         println!("Elapsed time: {:.2?}", before.elapsed());
     }
 }
 
-fn _basic() {
+fn basic() {
     let input = read_to_string(get_data_path("input/puzzle17.txt")).unwrap();
     let description = ComputerDescription::parse(&input).unwrap();
 
@@ -52,7 +53,7 @@ fn _basic() {
 }
 
 fn advanced() {
-    let input = read_to_string(get_data_path("input/puzzle17_test.txt")).unwrap();
+    let input = read_to_string(get_data_path("input/puzzle17.txt")).unwrap();
     let description = ComputerDescription::parse(&input).unwrap();
 
     let mut linear_program = description.program.clone();
@@ -79,19 +80,61 @@ fn advanced() {
         }
     }
 
-    let mut step_variants: Vec<Vec<u64>> = Vec::new();
-    for (i, byte) in description.program.iter().enumerate() {
-        step_variants.push(out_to_a.get(byte).unwrap());
-        for j in 0..4 {
+    // let mut log_writer = LineWriter::new(
+    //     File::create(get_data_path("output/puzzle17_log.txt")).unwrap()
+    // );
 
+    let mut stack: Vec<(usize, PersistentList<u64>)> = Vec::new();
+    stack.push((0, PersistentList::new()));
+    let mut results = HashSet::new();
+
+    while let Some((next_step, list)) = stack.pop() {
+        if next_step >= description.program.len() + 3 {
+            let mut result = 0;
+            for byte in list {
+                result = (result << 3) | (byte & 0b111);
+            }
+            results.insert(result);
+        } else {
+            let from_out = description.program.get(next_step).and_then(|next_byte| out_to_a.get(next_byte));
+            let mut candidates: Vec<u64> = Vec::new();
+            if let Some(from_out) = from_out {
+                candidates.extend(from_out.iter());
+            } else {
+                candidates.extend(0..1024);
+            }
+
+            'candidate: for candidate in candidates {
+                let mut current = list.clone();
+                let mut mask = 0b1111111;
+                for i in 1..=3 {
+                    if let Some(expected) = current.first().clone() {
+                        let diff = (expected >> (i * 3)) ^ (candidate & mask);
+                        if diff != 0 {
+                            continue 'candidate;
+                        }
+                        current = current.rest();
+                        mask >>= 3;
+                    } else {
+                        break;
+                    }
+                }
+                let next_list = cons(candidate, list.clone());
+                // writeln!(log_writer, "{}", next_list).unwrap();
+                stack.push((next_step + 1, next_list));
+            }
         }
     }
 
-    // for (out, a_variants) in out_to_a.iter() {
-    //     println!("out={out} when a={a_variants:?}");
-    // }
+    let min_result = results.iter().min().unwrap();
+    let mut state = ComputerState::new();
+    let mut output = Vec::new();
+    description.initialize(&mut state);
+    state.register_a = *min_result;
+    description.run(&mut state, |n| output.push(n)).unwrap();
+    let joined_output = output.iter().map(|n| n.to_string()).collect::<Vec<String>>().join(",");
 
-    println!("Register A for quine (advanced): {}", 0);
+    println!("Min register A for quine (advanced): {} with output {}", min_result, joined_output);
 }
 
 fn disassemble<W: Write>(writer: &mut W, program: &Vec<u8>) -> Result<(), Box<dyn Error>> {
@@ -312,7 +355,7 @@ impl std::fmt::Display for Instruction {
                 write!(f, "jnz if A goto #{}", self.1)
             }
             Opcode::Bxc => {
-                write!(f, "bxc B ^ C -> B : {}", self.1)
+                write!(f, "bxc B ^ C -> B (with unused {})", self.1)
             }
             Opcode::Out => {
                 write!(f, "out {} % 8", self.1)
