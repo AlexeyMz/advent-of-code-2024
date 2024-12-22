@@ -16,7 +16,7 @@ fn basic() {
             .filter(|line| !line.is_empty())
             .map(|line| line.into())
             .collect::<Vec<String>>()
-    );
+    ).unwrap();
 
     let graph = MazeGraph::new(&maze);
     let mut astar = AStar::new(graph);
@@ -62,7 +62,7 @@ fn advanced() {
             .filter(|line| !line.is_empty())
             .map(|line| line.into())
             .collect::<Vec<String>>()
-    );
+    ).unwrap();
 
     let goal = maze.find(&'E').unwrap();
     maze.set(goal, '.');

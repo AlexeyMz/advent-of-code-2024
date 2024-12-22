@@ -100,25 +100,25 @@ impl<T: Clone + PartialEq> Grid<T> {
 }
 
 impl Grid<char> {
-    pub fn from_lines(lines: &[String]) -> Grid<char> {
+    pub fn from_lines(lines: &[String]) -> Result<Grid<char>, String> {
         let height = lines.len();
         let width = if lines.is_empty() { 0 } else { lines[0].len() };
         let mut data = vec!['\0'; width * height];
         let mut offset: usize = 0;
         for line in lines {
             if line.len() != width {
-                panic!("Grid: inconsistent line length");
+                Err("Grid: inconsistent line length")?;
             }
             for ch in line.chars() {
                 data[offset] = ch;
                 offset += 1;
             }
         }
-        return Grid {
+        return Ok(Grid {
             data,
             width: width.try_into().unwrap(),
             height: height.try_into().unwrap(),
-        };
+        });
     }
 
     pub fn lines<'a>(&'a self) -> impl Iterator<Item = String> + 'a {

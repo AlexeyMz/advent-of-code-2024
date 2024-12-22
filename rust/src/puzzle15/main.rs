@@ -236,7 +236,7 @@ fn parse_input(input: &str) -> (Grid<char>, String) {
         }
     }
     return (
-        Grid::from_lines(&grid_lines[..]),
+        Grid::from_lines(&grid_lines[..]).unwrap(),
         steps
     );
 }
