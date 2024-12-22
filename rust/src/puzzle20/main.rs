@@ -1,5 +1,5 @@
 use core::{get_data_path, Grid};
-use std::{collections::{HashMap, HashSet}, fmt::Debug, fs::read_to_string};
+use std::{collections::{HashMap, HashSet}, fs::read_to_string};
 
 fn main() {
     use std::time::Instant;
@@ -82,27 +82,6 @@ fn advanced() {
     println!("Large cheats count (advanced): {large_cheats_count}");
 }
 
-#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
-enum Direction { North, East, South, West }
-
-impl Direction {
-    fn offset(&self) -> (i32, i32) {
-        match self {
-            Direction::North => (0, -1),
-            Direction::South => (0, 1),
-            Direction::West => (-1, 0),
-            Direction::East => (1, 0),
-        }
-    }
-}
-
-const ALL_DIRECTIONS: [Direction; 4] = [
-    Direction::North,
-    Direction::East,
-    Direction::South,
-    Direction::West,
-];
-
 struct RaceTrack {
     distances: Grid<i32>,
     tiles: Vec<(i32, i32)>,
@@ -123,9 +102,8 @@ impl RaceTrack {
         tiles.push(current);
 
         while current != end {
-            for direction in ALL_DIRECTIONS {
-                let offset = direction.offset();
-                let next = (current.0 + offset.0, current.1 + offset.1);
+            for (dx, dy) in [(-1, 0), (1, 0), (0, -1), (0, 1)] {
+                let next = (current.0 + dx, current.1 + dy);
                 if next != previous && grid.get(next).unwrap_or('#') != '#' {
                     previous = current;
                     current = next;
