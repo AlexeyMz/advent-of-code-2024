@@ -30,6 +30,8 @@ fn basic() {
     for code in codes {
         let mut total_path: Vec<char> = Vec::new();
 
+        println!("\nEntering code: {}", code.iter().collect::<String>());
+
         let mut previous = KeypadNode(('A', 'A', 'A'));
         for i in 0..code.len() {
             let next = code[i];
@@ -54,12 +56,15 @@ fn basic() {
                 .collect();
 
             total_path.extend(path_segment.iter().rev());
-            if i != code.len() {
-                total_path.push('A');
-            }
+            total_path.push('A');
 
-            // println!("Found goal {:?} in {} steps,", goal.0, steps);
-            // println!("  path: {}", total_path.iter().collect::<String>());
+            let segments = astar
+                .iter_back_path(goal.0)
+                .collect::<Vec<_>>().into_iter().rev();
+            for segment in segments {
+                println!("  {} {:?}", segment.1.map(|a| a.to_char()).unwrap_or(' '), segment.0);
+            }
+            println!("Found goal {:?}:", goal.0);
 
             previous = goal.clone();
         }

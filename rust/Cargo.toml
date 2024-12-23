@@ -7,8 +7,11 @@ edition = "2021"
 fplist = "0.2.1"
 priority-queue = "2.1.1"
 regex = "1.11.1"
-z3 = "0.12.1"
-z3-sys = "0.8.1"
+z3 = { version = "0.12.1", optional = true }
+z3-sys = { version = "0.8.1", optional = true }
+
+[features]
+z3 = ["dep:z3", "dep:z3-sys"]
 
 [lib]
 name = "core"
@@ -17,6 +20,7 @@ path = "src/core/lib.rs"
 [[bin]]
 name = "puzzle13"
 path = "src/puzzle13/main.rs"
+required-features = ["z3"]
 
 [[bin]]
 name = "puzzle15"
