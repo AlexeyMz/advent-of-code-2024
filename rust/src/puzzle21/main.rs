@@ -9,19 +9,19 @@ fn main() {
 }
 
 fn basic() {
-    let input = read_to_string(get_data_path("input/puzzle21_test.txt")).unwrap();
+    let input = read_to_string(get_data_path("input/puzzle21.txt")).unwrap();
     let codes: Vec<_> = input.lines()
         .filter(|line| !line.is_empty())
         .map(|line| line.chars().collect::<Vec<_>>())
         .collect();
 
-    let numpad_graph = pad_graph(&Grid::from([
+    let numpad_graph = PadGraph::new(&Grid::from([
         ['7', '8', '9'],
         ['4', '5', '6'],
         ['1', '2', '3'],
         [' ', '0', 'A'],
     ]));
-    let arrowpad_graph = pad_graph(&Grid::from([
+    let arrowpad_graph = PadGraph::new(&Grid::from([
         [' ', '^', 'A'],
         ['<', 'v', '>'],
     ]));
@@ -30,7 +30,7 @@ fn basic() {
     for code in codes {
         let mut total_path: Vec<char> = Vec::new();
 
-        println!("\nEntering code: {}", code.iter().collect::<String>());
+        // println!("\nEntering code: {}", code.iter().collect::<String>());
 
         let mut previous = KeypadNode(('A', 'A', 'A'));
         for i in 0..code.len() {
@@ -58,13 +58,13 @@ fn basic() {
             total_path.extend(path_segment.iter().rev());
             total_path.push('A');
 
-            let segments = astar
-                .iter_back_path(goal.0)
-                .collect::<Vec<_>>().into_iter().rev();
-            for segment in segments {
-                println!("  {} {:?}", segment.1.map(|a| a.to_char()).unwrap_or(' '), segment.0);
-            }
-            println!("Found goal {:?}:", goal.0);
+            // let segments = astar
+            //     .iter_back_path(goal.0)
+            //     .collect::<Vec<_>>().into_iter().rev();
+            // for segment in segments {
+            //     println!("  {} {:?}", segment.1.map(|a| a.to_char()).unwrap_or(' '), segment.0);
+            // }
+            // println!("Found goal {:?}:", goal.0);
 
             previous = goal.clone();
         }
@@ -80,34 +80,38 @@ fn basic() {
     println!("Total code complexity (basic): {}", total_complexity);
 }
 
-type PadGraph = HashMap<char, HashMap<Action, char>>;
+struct PadGraph(HashMap<char, HashMap<Action, char>>);
 
-fn pad_graph(pad: &Grid<char>) -> PadGraph {
-    let actions = [Action::Up, Action::Down, Action::Left, Action::Right];
-    let mut graph: PadGraph = HashMap::new();
-    for i in 0..pad.width() {
-        for j in 0..pad.height() {
-            let from = (i, j);
-            let from_button = pad.get(from).unwrap();
-            let edges: &mut _ = graph.entry(from_button).or_default();
-            for action in actions.iter() {
-                let to = action.step(from);
-                if let Some(to_button) = pad.get(to) {
-                    edges.insert(*action, to_button);
+impl PadGraph {
+    fn new(pad: &Grid<char>) -> PadGraph {
+        let actions = [Action::Up, Action::Down, Action::Left, Action::Right];
+        let mut graph: HashMap<char, HashMap<Action, char>> = HashMap::new();
+        for i in 0..pad.width() {
+            for j in 0..pad.height() {
+                let from = (i, j);
+                let from_button = pad.get(from).unwrap();
+                let edges: &mut _ = graph.entry(from_button).or_default();
+                for action in actions.iter() {
+                    let to = action.step(from);
+                    if let Some(to_button) = pad.get(to) {
+                        if to_button != ' ' {
+                            edges.insert(*action, to_button);
+                        }
+                    }
                 }
             }
         }
+        return PadGraph(graph);
     }
-    return graph;
-}
 
-fn step_pad(pad_graph: &PadGraph, from: char, action: Action) -> Option<char> {
-    if let Some(edges) = pad_graph.get(&from) {
-        if let Some(&to) = edges.get(&action) {
-            return Some(to);
+    fn step(&self, from: char, action: Action) -> Option<char> {
+        if let Some(edges) = self.0.get(&from) {
+            if let Some(&to) = edges.get(&action) {
+                return Some(to);
+            }
         }
+        return None;
     }
-    return None;
 }
 
 #[derive(Clone, Debug)]
@@ -167,21 +171,21 @@ impl<'a> KeypadGraph<'a> {
         if current == Action::Push {
             current = Action::from_char(*a2)?;
         } else {
-            return step_pad(&self.arrowpad, *a2, current)
+            return self.arrowpad.step(*a2, current)
                 .map(|to| KeypadNode((*n, *a1, to)));
         }
 
         if current == Action::Push {
             current = Action::from_char(*a1)?;
         } else {
-            return step_pad(&self.arrowpad, *a1, current)
+            return self.arrowpad.step(*a1, current)
                 .map(|to| KeypadNode((*n, to, *a2)));
         }
 
         if current == Action::Push {
             return None;
         } else {
-            return step_pad(&self.numpad, *n, current)
+            return self.numpad.step(*n, current)
                 .map(|to| KeypadNode((to, *a1, *a2)));
         }
     }
