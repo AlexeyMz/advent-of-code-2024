@@ -24,6 +24,14 @@ impl<T: Clone> Grid<T> {
         }
     }
 
+    pub fn from<const WIDTH: usize, const HEIGHT: usize>(data: [[T; WIDTH]; HEIGHT]) -> Grid<T> {
+        Grid {
+            data: data.into_iter().flatten().collect(),
+            width: WIDTH.try_into().unwrap(),
+            height: HEIGHT.try_into().unwrap(),
+        }
+    }
+
     pub fn map<U: Clone>(&self, mapper: impl FnMut(&T) -> U) -> Grid<U> {
         Grid {
             data: self.data.iter().map(mapper).collect(),
