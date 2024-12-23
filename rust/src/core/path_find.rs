@@ -9,10 +9,11 @@ pub trait AStarNode: Clone {
 }
 
 pub trait AStarGraph<N: AStarNode> {
+    type Edge: Clone;
     type Cost: Add<Output = Self::Cost> + Ord + Copy + Default;
 
     fn start(&self) -> N;
-    fn neighbors(&self, node: &N) -> impl Iterator<Item = (N, Self::Cost)> + '_;
+    fn neighbors(&self, node: &N) -> impl Iterator<Item = (N, Self::Edge, Self::Cost)> + '_;
     fn estimate(&self, node: &N) -> Self::Cost;
     fn is_goal(&self, node: &N) -> bool;
 
@@ -29,7 +30,7 @@ pub struct AStar<N: AStarNode, G: AStarGraph<N>> {
 
 struct AStarPath<N: AStarNode, G: AStarGraph<N>> {
     to: N,
-    from: Vec<N::Key>,
+    from: Vec<(N::Key, G::Edge)>,
     cost: G::Cost,
 }
 
@@ -70,7 +71,7 @@ impl<N: AStarNode, G: AStarGraph<N>> AStar<N, G> {
         }
     }
 
-    pub fn get_from(&self, to: &N::Key) -> impl Iterator<Item = &N::Key> + '_ {
+    pub fn get_from(&self, to: &N::Key) -> impl Iterator<Item = &(N::Key, G::Edge)> + '_ {
         self.paths.get(to)
             .into_iter()
             .flat_map(|path| path.from.iter())
@@ -105,7 +106,7 @@ impl<N: AStarNode, G: AStarGraph<N>> AStar<N, G> {
                 return true;
             }
 
-            for (neighbor, edge_cost) in self.graph.neighbors(&path_to) {
+            for (neighbor, edge, edge_cost) in self.graph.neighbors(&path_to) {
                 let neighbor_cost = path_cost + edge_cost;
                 let estimated_cost = neighbor_cost + self.graph.estimate(&neighbor);
                 let neighbor_key = neighbor.key();
@@ -117,19 +118,19 @@ impl<N: AStarNode, G: AStarGraph<N>> AStar<N, G> {
                         }
                         self.paths.insert(neighbor_key.clone(), AStarPath {
                             to: neighbor,
-                            from: vec![key.clone()],
+                            from: vec![(key.clone(), edge.clone())],
                             cost: neighbor_cost,
                         });
                     } else if neighbor_cost == existing.cost {
                         self.graph.on_visit_edge(&path_to, &neighbor, edge_cost);
-                        existing.from.push(key.clone());
+                        existing.from.push((key.clone(), edge.clone()));
                     }
                 } else {
                     self.graph.on_visit_edge(&path_to, &neighbor, edge_cost);
                     self.queue.push(neighbor_key.clone(), PathCost(estimated_cost));
                     self.paths.insert(neighbor_key.clone(), AStarPath {
                         to: neighbor,
-                        from: vec![key.clone()],
+                        from: vec![(key.clone(), edge.clone())],
                         cost: neighbor_cost,
                     });
                 }
@@ -137,5 +138,34 @@ impl<N: AStarNode, G: AStarGraph<N>> AStar<N, G> {
             return false;
         }
         return true;
+    }
+
+    pub fn iter_back_path(&self, from: N::Key) -> impl Iterator<Item = (&N, Option<&G::Edge>)> {
+        return AStarPathIterator {
+            paths: &self.paths,
+            current: Some(from),
+        };
+    }
+}
+
+struct AStarPathIterator<'a, N: AStarNode, G: AStarGraph<N>> {
+    paths: &'a HashMap<N::Key, AStarPath<N, G>>,
+    current: Option<N::Key>,
+}
+
+impl<'a, N: AStarNode, G: AStarGraph<N>> Iterator for AStarPathIterator<'a, N, G> {
+    type Item = (&'a N, Option<&'a G::Edge>);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(from) = self.current.take() {
+            if let Some(path) = self.paths.get(&from) {
+                let first = path.from.first();
+                self.current = first.map(|pair| pair.0.clone());
+                return Some((&path.to, first.map(|pair| &pair.1)));
+            } else {
+                self.current = None;
+            }
+        }
+        return None;
     }
 }

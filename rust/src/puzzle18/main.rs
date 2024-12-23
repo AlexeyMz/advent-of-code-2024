@@ -33,14 +33,8 @@ fn basic() {
     match astar.found_goal() {
         Some((final_node, final_cost)) => {
             let mut path = ram.clone();
-            let mut current = Some(final_node.key());
-            while let Some(to) = current {
-                path.set((to.0, to.1), 'O');
-                current = None;
-                for from in astar.get_from(&to) {
-                    current = Some(*from);
-                    break;
-                }
+            for (to, _) in astar.iter_back_path(final_node.key()) {
+                path.set((to.x, to.y), 'O');
             }
 
             let mut path_writer = LineWriter::new(
@@ -161,6 +155,7 @@ impl<'a> RamGraph<'a> {
 }
 
 impl<'a> AStarGraph<RamNode> for RamGraph<'a> {
+    type Edge = ();
     type Cost = i32;
 
     fn start(&self) -> RamNode {
@@ -168,7 +163,7 @@ impl<'a> AStarGraph<RamNode> for RamGraph<'a> {
         RamNode { x, y }
     }
 
-    fn neighbors(&self, node: &RamNode) -> impl Iterator<Item = (RamNode, Self::Cost)> + '_ {
+    fn neighbors(&self, node: &RamNode) -> impl Iterator<Item = (RamNode, (), Self::Cost)> + '_ {
         let from = node.clone();
         let directions = [
             Direction::North,
@@ -182,7 +177,7 @@ impl<'a> AStarGraph<RamNode> for RamGraph<'a> {
                 return (from.x + offset.0, from.y + offset.1);
             })
             .filter(|&next| self.ram.get(next).is_some_and(|v| v != '#'))
-            .map(|(x, y)| (RamNode { x, y }, 1));
+            .map(|(x, y)| (RamNode { x, y }, (), 1));
     }
 
     fn estimate(&self, node: &RamNode) -> Self::Cost {

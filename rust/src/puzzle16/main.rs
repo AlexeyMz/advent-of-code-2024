@@ -29,14 +29,8 @@ fn basic() {
     match astar.found_goal() {
         Some((final_node, final_cost)) => {
             let mut path = maze.clone();
-            let mut current = Some(final_node.key());
-            while let Some(to) = current {
-                path.set((to.0, to.1), to.2.to_char());
-                current = None;
-                for from in astar.get_from(&to) {
-                    current = Some(*from);
-                    break;
-                }
+            for (to, _) in astar.iter_back_path(final_node.key()) {
+                path.set((to.x, to.y), to.direction.to_char());
             }
 
             let mut path_writer = LineWriter::new(
@@ -90,7 +84,7 @@ fn advanced() {
 
     while let Some(to_key) = to_visit.pop() {
         best_paths.set((to_key.0, to_key.1), 'O');
-        for origin in astar.get_from(&to_key) {
+        for (origin, _) in astar.get_from(&to_key) {
             to_visit.push(origin.clone());
         }
     }
@@ -188,6 +182,7 @@ impl<'a> MazeGraph<'a> {
 }
 
 impl<'a> AStarGraph<MazeNode> for MazeGraph<'a> {
+    type Edge = ();
     type Cost = i32;
 
     fn start(&self) -> MazeNode {
@@ -195,7 +190,7 @@ impl<'a> AStarGraph<MazeNode> for MazeGraph<'a> {
         MazeNode { x, y, direction: Direction::East }
     }
 
-    fn neighbors(&self, node: &MazeNode) -> impl Iterator<Item = (MazeNode, Self::Cost)> + '_ {
+    fn neighbors(&self, node: &MazeNode) -> impl Iterator<Item = (MazeNode, (), Self::Cost)> + '_ {
         MazeNeighbors {
             maze: &self.maze,
             from_x: node.x,
@@ -247,7 +242,7 @@ struct MazeNeighbors<'a> {
 }
 
 impl<'a> Iterator for MazeNeighbors<'a> {
-    type Item = (MazeNode, i32);
+    type Item = (MazeNode, (), i32);
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
@@ -262,7 +257,7 @@ impl<'a> Iterator for MazeNeighbors<'a> {
                             y: next.1,
                             direction: self.direction,
                         };
-                        return Some((node, 1));
+                        return Some((node, (), 1));
                     }
                 }
                 1 | 2 => {
@@ -277,7 +272,7 @@ impl<'a> Iterator for MazeNeighbors<'a> {
                         y: self.from_y,
                         direction,
                     };
-                    return Some((node, 1000));
+                    return Some((node, (), 1000));
                 }
                 _ => { break; }
             }
