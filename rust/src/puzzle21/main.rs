@@ -5,6 +5,7 @@ fn main() {
     use std::time::Instant;
     let before = Instant::now();
     basic();
+    advanced();
     println!("Elapsed time: {:.2?}", before.elapsed());
 }
 
@@ -70,7 +71,8 @@ fn basic() {
         }
 
         let code_str = code.iter().collect::<String>();
-        println!("{}: {}", code_str, total_path.iter().collect::<String>());
+        let path = total_path.iter().collect::<String>();
+        println!("{}: {} length = {}", code_str, path, path.len());
 
         let length_part: i32 = total_path.len().try_into().unwrap();
         let numeric_part = code_str[..code_str.len() - 1].parse::<i32>().unwrap();
@@ -78,6 +80,46 @@ fn basic() {
     }
 
     println!("Total code complexity (basic): {}", total_complexity);
+}
+
+fn advanced() {
+    let input = read_to_string(get_data_path("input/puzzle21.txt")).unwrap();
+    let codes: Vec<_> = input.lines()
+        .filter(|line| !line.is_empty())
+        .map(|line| line.chars().collect::<Vec<_>>())
+        .collect();
+
+    let numpad = Keypad::new(Grid::from([
+        ['7', '8', '9'],
+        ['4', '5', '6'],
+        ['1', '2', '3'],
+        [' ', '0', 'A'],
+    ]));
+    let arrowpad = Keypad::new(Grid::from([
+        [' ', '^', 'A'],
+        ['<', 'v', '>'],
+    ]));
+
+    let mut sequence = KeypadSequence::new(&numpad, &arrowpad, 25);
+
+    let mut total_complexity = 0;
+    for code in codes {
+        let mut result = 0;
+        let mut previous = 'A';
+        for i in 0..code.len() {
+            let next = code[i];
+            result += sequence.for_input(0, previous, next, 1);
+            previous = next;
+        }
+
+        let code_str = code.iter().collect::<String>();
+        println!("{}: length = {}", code_str, result);
+
+        let numeric_part = code_str[..code_str.len() - 1].parse::<u64>().unwrap();
+        total_complexity += result * numeric_part;
+    }
+
+    println!("Total code complexity (advanced): {}", total_complexity);
 }
 
 struct PadGraph(HashMap<char, HashMap<Action, char>>);
@@ -90,6 +132,9 @@ impl PadGraph {
             for j in 0..pad.height() {
                 let from = (i, j);
                 let from_button = pad.get(from).unwrap();
+                if from_button == ' ' {
+                    continue;
+                }
                 let edges: &mut _ = graph.entry(from_button).or_default();
                 for action in actions.iter() {
                     let to = action.step(from);
@@ -240,5 +285,111 @@ impl<'a> AStarGraph<KeypadNode> for KeypadGraph<'a> {
         if self.debug {
             println!("    -> {:?} (cost {})", to, cost);
         }
+    }
+}
+
+struct Keypad {
+    moves: HashMap<(char, char), Vec<(char, u64)>>,
+}
+
+impl Keypad {
+    fn new(pad: Grid<char>) -> Keypad {
+        let mut moves = HashMap::new();
+        for from_x in 0..pad.width() {
+            for from_y in 0..pad.height() {
+                for to_x in 0..pad.width() {
+                    for to_y in 0..pad.height() {
+                        let from = pad.get((from_x, from_y)).unwrap();
+                        let to = pad.get((to_x, to_y)).unwrap();
+                        moves.insert((from, to), Self::optimal_moves(&pad, from_x, from_y, to_x, to_y)
+                            .into_iter().map(|m| (m.0, m.1.try_into().unwrap())).collect()
+                        );
+                    }
+                }
+            }
+        }
+        return Keypad { moves };
+    }
+
+    fn optimal_moves(pad: &Grid<char>, from_x: i32, from_y: i32, to_x: i32, to_y: i32) -> Vec<(char, i32)> {
+        let mut moves = Vec::new();
+        let move_x = if to_x > from_x {('>', to_x - from_x) } else { ('<', from_x - to_x) };
+        let move_y = if to_y > from_y { ('v', to_y - from_y) } else { ('^', from_y - to_y) };
+        if from_x == to_x {
+            moves.push(move_y);
+        } else if from_y == to_y {
+            moves.push(move_x);
+        } else {
+            if pad.get((to_x, from_y)).unwrap() == ' ' {
+                moves.push(move_y);
+                moves.push(move_x);
+            } else if pad.get((from_x, to_y)).unwrap() == ' ' {
+                moves.push(move_x);
+                moves.push(move_y);
+            } else if move_x.0 == '<' {
+                moves.push(move_x);
+                moves.push(move_y);
+            } else {
+                moves.push(move_y);
+                moves.push(move_x);
+            }
+        }
+        return moves;
+    }
+
+    fn get_moves(&self, from: char, to: char) -> impl Iterator<Item = &(char, u64)> {
+        self.moves.get(&(from, to)).into_iter()
+            .flat_map(|v| v.iter())
+    }
+}
+
+struct KeypadSequence<'a> {
+    numpad: &'a Keypad,
+    arrowpad: &'a Keypad,
+    arrowpad_count: usize,
+    memoized_presses: HashMap<(usize, char, char, u64), u64>,
+    debug: bool,
+}
+
+impl<'a> KeypadSequence<'a> {
+    fn new(
+        numpad: &'a Keypad,
+        arrowpad: &'a Keypad,
+        arrowpad_count: usize,
+    ) -> KeypadSequence<'a> {
+        KeypadSequence {
+            numpad,
+            arrowpad,
+            arrowpad_count,
+            memoized_presses: HashMap::new(),
+            debug: false,
+        }
+    }
+
+    fn for_input(&mut self, index: usize, from: char, to: char, count: u64) -> u64 {
+        if let Some(&presses) = self.memoized_presses.get(&(index, from, to, count)) {
+            return presses;
+        } else if self.debug {
+            println!("{}[{index:0>2}] {from} ~ {to} ({count})", " ".repeat(index));
+        }
+
+        let presses = if count == 0 {
+            0
+        } else if index > self.arrowpad_count {
+            count
+        } else {
+            let mut presses_to_move = 0;
+            let pad = if index == 0 { self.numpad } else { self.arrowpad };
+            let mut previous = 'A';
+            for &(button, presses) in pad.get_moves(from, to) {
+                presses_to_move += self.for_input(index + 1, previous, button, presses);
+                previous = button;
+            }
+            presses_to_move += self.for_input(index + 1, previous, 'A', count);
+            presses_to_move
+        };
+
+        self.memoized_presses.insert((index, from, to, count), presses);
+        return presses;
     }
 }
