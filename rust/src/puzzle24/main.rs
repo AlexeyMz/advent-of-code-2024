@@ -5,13 +5,13 @@ fn main() {
     use std::time::Instant;
     let before = Instant::now();
     basic();
+    advanced();
     println!("Elapsed time: {:.2?}", before.elapsed());
 }
 
 fn basic() {
     let input = read_to_string(get_data_path("input/puzzle24.txt")).unwrap();
     let data = WireData::parse(&input).unwrap();
-    write_wire_graph_turtle(&data).unwrap();
 
     let mut states= HashMap::new();
     for (&node, &state) in data.initial.iter() {
@@ -32,6 +32,15 @@ fn basic() {
     }
 
     println!("Computed wire result: {}", z_result);
+}
+
+fn advanced() {
+    let input = read_to_string(get_data_path("input/puzzle24.txt")).unwrap();
+    let data = WireData::parse(&input).unwrap();
+
+    // Solve puzzle visually by looking at the graph via
+    // https://reactodia.github.io/playground/rdf
+    write_wire_graph_turtle(&data).unwrap();
 }
 
 #[derive(Copy, Clone)]
